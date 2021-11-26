@@ -87,22 +87,47 @@ lacondos$CF <- lacondos$CMA/lacondos$CMAT
 
 #View(lacondos)
 lacondos$Date <- dates$value
-lacondos$Month <- months(dates$value)
 
-f1 <- as.formula(paste(variable_of_interest, " ~ ", aggresult))
+lacondos[,aggresult] = switch(  
+  f$scale,  
+  "monthly"= months(dates$value),  
+  #"daily"= lacondos[,aggresult] <- weekdays(dates$value)
+  "quarterly"= quarters(dates$value),  
+  #"weekly"= c("Week" = "Week"),
+) 
 
-Linear_A_Seasonal_Indexes <- aggregate(f1, lacondos , mean)
-Linear_M_Seasonal_Indexes_Adj <- as_data_frame(Linear_A_Seasonal_Indexes[,variable_of_interest]/sum(Linear_A_Seasonal_Indexes[,variable_of_interest]))
-lacondos$Linear_M_Seasonal_Ratios <- lacondos[,variable_of_interest]/lacondos$CMA
+
+Linear_A_Seasonal_Index <- lacondos[,variable_of_interest] - lacondos$CMA
+colnames(Linear_A_Seasonal_Index) <- "Linear_A_Seasonal_Index"
+Linear_A_Seasonal_Index <- cbind(Linear_A_Seasonal_Index,lacondos[,aggresult,drop=FALSE])
+#colnames(Linear_A_Seasonal_Indexes) <- c("Linear_A_Seasonal_Indexes",aggresult)
+
+f1 <- as.formula(paste("Linear_A_Seasonal_Index", " ~ ", aggresult))
+
+Linear_A_Seasonal_Indexes <- aggregate(f1, na.omit(Linear_A_Seasonal_Index) , mean)
+
+Linear_A_Seasonal_Indexes_Adj <- Linear_A_Seasonal_Indexes[,"Linear_A_Seasonal_Index",drop=FALSE]-mean(Linear_A_Seasonal_Indexes[,"Linear_A_Seasonal_Index"])
+colnames(Linear_A_Seasonal_Indexes_Adj) <- "Linear_A_Seasonal_Indexes_Adj"
+rownames(Linear_A_Seasonal_Indexes_Adj) <- Linear_A_Seasonal_Indexes[,aggresult]
+
+Linear_A_Seasonal_Indexes$Linear_A_Seasonal_Indexes_Adj = Linear_A_Seasonal_Indexes_Adj
+
+Linear_A_Seasonal_Indexes_Adj[,aggresult] = Linear_A_Seasonal_Indexes[,aggresult]
+
+lacondos <- lacondos %>% left_join(Linear_A_Seasonal_Indexes_Adj, by = aset)
+
+
+Linear_M_Seasonal_Ratios <- lacondos[,variable_of_interest]/lacondos$CMA
+Linear_M_Seasonal_Ratios <- cbind(Linear_M_Seasonal_Ratios,lacondos[,aggresult,drop=FALSE])
 
 f2 <- as.formula(paste("Linear_M_Seasonal_Ratios", " ~ ", aggresult))
-Linear_M_Seasonal_Indexes <- aggregate(f2, lacondos, mean)
+Linear_M_Seasonal_Indexes <- aggregate(f2, Linear_M_Seasonal_Ratios, mean)
 
-Linear_M_Seasonal_Indexes_Adj <- as.data.frame(Linear_M_Seasonal_Indexes[,"V1"]/mean(Linear_M_Seasonal_Indexes[,"V1"]))
+Linear_M_Seasonal_Indexes_Adj <- as.data.frame(Linear_M_Seasonal_Indexes[,"Linear_M_Seasonal_Ratios"]/mean(Linear_M_Seasonal_Indexes[,"Linear_M_Seasonal_Ratios"]))
 colnames(Linear_M_Seasonal_Indexes_Adj) <- "Linear_M_Seasonal_Indexes_Adj"
 Linear_M_Seasonal_Indexes$Linear_M_Seasonal_Indexes_Adj = Linear_M_Seasonal_Indexes_Adj
 
-Linear_M_Seasonal_Indexes_Adj[,aggresult] = Linear_M_Seasonal_Indexes$Month
+Linear_M_Seasonal_Indexes_Adj[,aggresult] = Linear_M_Seasonal_Indexes[,aggresult]
 
 #cset = paste("\"", aggresult,"\"", " = ", "\"", aggresult"\"")
 #c(eval(paste('"',aggresult,'"',' = ','"',aggresult,'"',sep="")))
@@ -168,7 +193,8 @@ lacondos$CF[match(rownames(ar_CF_linear_forecast),rownames(lacondos))] = ar_CF_l
 sum(na.omit(ar_CF_linear_forecast$residuals)^2)
 
 lacondos$forecast_ar_M_linear <- lacondos$CMAT*lacondos$CF*lacondos$`Linear_M_Seasonal_Indexes_Adj`
-#lacondos$forecast_ar_A_linear <- lacondos$CMAT*lacondos$CF*lacondos$`Linear_M_Seasonal_Indexes_Adj`
+lacondos$forecast_ar_A_linear <- lacondos$CMAT+lacondos$CF+lacondos$`Linear_A_Seasonal_Indexes_Adj`
+
 lacondos$forecast_ar_M_nonlinear <- lacondos$CMAT*lacondos$CF*lacondos$`Linear_M_Seasonal_Indexes_Adj`
 #lacondos$forecast_ar_A_linear <- lacondos$CMAT+lacondos$CF+lacondos$`Linear_M_Seasonal_Indexes_Adj`
 
