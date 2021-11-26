@@ -27,6 +27,7 @@
 findknee <- function(xdata)
 {
   rate_of_change=(xdata[1]-xdata[length(xdata)])/(length(xdata)-1)
+  print(rate_of_change)
   xdata$delta = xdata-xdata[length(xdata)]
   xdata$deltas[1] = xdata$delta[1]
   for (d in 2:length(xdata))
@@ -39,7 +40,6 @@ findknee <- function(xdata)
   }
   return(abs(xdata$deltas))
 }
-
 
 df <- read.csv(file="C:\\Users\\User\\Documents\\wiki\\wiki\\dev\\python\\python-ml\\data\\raw\\states.csv",text=readings, header = TRUE, sep = ",", dec = ".")
 
@@ -57,7 +57,7 @@ set.seed(Sys.time())
 
 bss_metric <- c()
 wss_metric <- c()
-for (k in 1:15)
+for (k in 1:50)
 {#k=2
   #print(k)
   km <- kmeans(proportional_scaled_data, nstart=1000, centers=k)
@@ -84,6 +84,7 @@ dev.off()
 
 #optimal # of clusters
 optimal_k <- which.min(abs(bss_curve/wss_curve-1))
+print(optimal_k)
 
 km_ <- kmeans(proportional_scaled_data, nstart=2000, centers=optimal_k)
 
