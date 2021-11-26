@@ -49,10 +49,6 @@ fresult = switch(
   holdout <- nrow(lacondos)-nrow(lacondos)*.7+validation
 }
 
-#plot(decompose(ts(lacondos,frequency=fresult),type="additive"))
-
-#plot(decompose(ts(lacondos,frequency=fresult),type="multiplicative"))
-
 lacondos$MA_trend <- lag(zoo::rollmean(lacondos$LXXRCSA, k = fresult, fill = NA, align="center"), n=1)
 lacondos$CMA <- zoo::rollmean(lacondos$MA_trend, k = fresult/2, fill = NA, align="left")
 lacondos$time <- 1:nrow(lacondos)
@@ -78,42 +74,39 @@ lacondos <- lacondos %>% left_join(Seasonal_Indexes_Adj, by = c('Month' = 'Month
 
 lacondos <- rename(lacondos,c("value" = "SI_Mult"))
 
-tail(lacondos,12)
+a <- decompose(ts(lacondos[,1,drop=FALSE],frequency=fresult),type="additive")
 
-#diff_CF <- diff(lacondos$CF)
+m <- decompose(ts(lacondos[,1,drop=FALSE],frequency=fresult),type="multiplicative")
+
+plot(a)
+plot(a$trend)
+
+N=length(lacondos$CF)
+alpha = .05
+-qnorm((1-alpha)/2)
+
+ciz = c(-1,1)+(-qnorm((1-alpha)/2)/sqrt(N-3))
+cir = (exp(2*ciz)-1)/(exp(2*ciz)+1)  
+                      
+significant_threshold=(exp(2*1.96/sqrt(N-3)-1))/(exp(2*1.96/sqrt(N-3)+1))
+                       
+ac_f <- acf(na.omit(lacondos$CF))
+
+if(any(ac_f$acf>significant_threshold))
+{
+  print("trend")
+}
+lines(lacondos$CF)
+
+tail(lacondos,12)
 
 ar <- auto.arima(na.omit(ts((lacondos$CF))),trace=FALSE,parallel = TRUE,stepwise=FALSE)
 
-#forecast(ar)
-
-#ar <- arima(na.omit(ts(lacondos$CF)), order=c(12,1,12))
-
-#forecast(ar)
-#lacondos$CF
-
-#forecast(ar)
-#plot(lacondos$CF,type="l")
-#lines(ar$fitted)
 plot(ar$residuals)
 acf(ar$residuals)
 pacf(ar$residuals)
 
-#pacf(ar$residuals,plot = FALSE)
 
-
-#ar <- arima(hits_ma, order=best_model$order[[1]])
-
-#plot(ar$fitted, lacondos$CF, main="Scatterplot Example",
-#     xlab="Car Weight ", ylab="Miles Per Gallon ", pch=19)
-
-#pacf(na.omit(ar$residuals))
-#plot(ts(tail(lacondos$CF,fresult*4)))
-
-#plot(na.omit(ar$residuals))
-#pacf(na.omit(ar$residuals))
-#acf(na.omit(ar$residuals))
-
-#plot(lacondos$CF)
 
 temp <- as.data.frame(as.matrix(forecast(ar)$mean))
 
