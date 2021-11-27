@@ -92,13 +92,24 @@ lines(cma_cycle_trend_nonlinear_additive_lacondos)
 ```
 
 ```{r}
-CF_lm <- lm(V1 ~., data=cbind(1:nrow(cma_cycle_trend_nonlinear_additive_lacondos),cma_cycle_trend_nonlinear_additive_lacondos))
+
+```
+
+
+```{r}
+CF_lm <- lm(V1 ~., data=cbind(rownames(na.omit(cma_cycle_trend_nonlinear_additive_lacondos))[1]:tail(rownames(na.omit(cma_cycle_trend_nonlinear_additive_lacondos)),1),na.omit(cma_cycle_trend_nonlinear_additive_lacondos)))
 CMAT_lacondos = CF_lm$fitted.values
 ```
 
 ```{r}
 CF_multiplicative_lacondos = cma_cycle_trend_nonlinear_additive_lacondos/CMAT_lacondos
-CF_additive_lacondos = cma_cycle_trend_nonlinear_additive_lacondos-CMAT_lacondos
+
+CF_additive_lacondos = merge(as.matrix(cma_cycle_trend_nonlinear_additive_lacondos),as.data.frame(CMAT_lacondos),by=0, all=TRUE)
+rownames(CF_additive_lacondos) <- CF_additive_lacondos$Row.names
+
+CF_additive_lacondos <- CF_additive_lacondos[order(as.numeric(row.names(CF_additive_lacondos))),]
+
+CF_additive_lacondos <- CF_additive_lacondos[,2]/CF_additive_lacondos[,3]
 
 M_SI <- colMeans(t(matrix(as.matrix(timeseries_lacondo/cma_cycle_trend_nonlinear_additive_lacondos),nrow=fresult)),na.rm=TRUE)
 M_SI <- M_SI/mean(M_SI)
@@ -125,14 +136,20 @@ plot(as.ts(rep(seasonal_nonlinear_additive_lacondos,fresult)))
 
 
 ```{r}
-random_nonlinear_additive_lacondos = matrix(ts(timeseries_lacondo,frequency=fresult) - ts(cma_cycle_trend_nonlinear_additive_lacondos,frequency=fresult) - ts(rep(seasonal_nonlinear_additive_lacondos,ceiling(length(ts(timeseries_lacondo,frequency=fresult))/fresult)),frequency=fresult))
+random_nonlinear_additive_lacondos = matrix(ts(timeseries_lacondo,frequency=fresult) - ts(cma_cycle_trend_nonlinear_additive_lacondos,frequency=fresult) - 
+ts(matrix(ts(seasonal_nonlinear_additive_lacondos,start=c(0,1),frequency=fresult,end=c(floor(nrow(timeseries_lacondo)/fresult),(nrow(timeseries_lacondo)%%fresult)))),,frequency=fresult)
+)
 plot(as.ts(random_nonlinear_additive_lacondos))
 ```
 
 
 ```{r}
-recomposed_nonlinear_additive_lacondos = cma_cycle_trend_nonlinear_additive_lacondos + seasonal_nonlinear_additive_lacondos + random_nonlinear_additive_lacondos
+recomposed_nonlinear_additive_lacondos = as.matrix(cma_cycle_trend_nonlinear_additive_lacondos) + matrix(ts(seasonal_nonlinear_additive_lacondos,start=c(0,1),frequency=fresult,end=c(floor(nrow(timeseries_lacondo)/fresult),(nrow(timeseries_lacondo)%%fresult)))) #+ random_nonlinear_additive_lacondos
+
+recomposed_linear_additive_lacondos = as.matrix(cma_cycle_trend_nonlinear_additive_lacondos) + matrix(ts(A_SI,start=c(0,1),frequency=fresult,end=c(floor(nrow(timeseries_lacondo)/fresult),(nrow(timeseries_lacondo)%%fresult)))) + as.matrix(CF_additive_lacondos)
+
 plot(as.ts(recomposed_nonlinear_additive_lacondos))
+lines(as.ts(recomposed_linear_additive_lacondos))
 ```
 
 
