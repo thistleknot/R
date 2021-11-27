@@ -25,11 +25,6 @@
 
 plan(multisession, workers = 4)
 
-#functions
-{
-  shift <- function(df, sv = 1) df[c((nrow(df)-sv+1):nrow(df), 1:(nrow(df)-sv)),]
-}
-
 lacondos <- read.csv("C:/Users/User/Documents/wiki/wiki/Excel/LACondos.csv",row.names=1)
 
 dates <- as_data_frame(as.Date(rownames(lacondos), format =  "%m/%d/%Y"))
@@ -83,7 +78,9 @@ CMA_df_lm <- lm(CMA ~ time, data=CMA_df)
 
 lacondos$CMAT <- 1:nrow(lacondos)*CMA_df_lm$coefficients[2]+CMA_df_lm$coefficients[1]
   
-lacondos$CF <- lacondos$CMA/lacondos$CMAT
+lacondos$linear_M_CF <- lacondos$CMA/lacondos$CMAT
+
+lacondos$linear_A_CF <- lacondos$CMA-lacondos$CMAT
 
 #View(lacondos)
 lacondos$Date <- dates$value
@@ -116,7 +113,6 @@ Linear_A_Seasonal_Indexes_Adj[,aggresult] = Linear_A_Seasonal_Indexes[,aggresult
 
 lacondos <- lacondos %>% left_join(Linear_A_Seasonal_Indexes_Adj, by = aset)
 
-
 Linear_M_Seasonal_Ratios <- lacondos[,variable_of_interest]/lacondos$CMA
 Linear_M_Seasonal_Ratios <- cbind(Linear_M_Seasonal_Ratios,lacondos[,aggresult,drop=FALSE])
 
@@ -135,7 +131,7 @@ Linear_M_Seasonal_Indexes_Adj[,aggresult] = Linear_M_Seasonal_Indexes[,aggresult
 lacondos <- lacondos %>% left_join(Linear_M_Seasonal_Indexes_Adj, by = aset)
 colnames(lacondos)
 
-plot(lacondos$CF)
+plot(lacondos$linear_M_CF)
 
 tail(lacondos,12)
 
@@ -166,38 +162,54 @@ length(a_model_nonlinear$trend)
 sum(a_model_nonlinear$residuals^2)
 sum(m_model_nonlinear$residuals^2)
 
-ar_CF_linear <- auto.arima((((na.omit(lacondos$CF)))),trace=FALSE,parallel = TRUE,stepwise=FALSE)
-length((na.omit(lacondos$CF)))
-length(((lacondos$CF)))
+ar_CF_M_linear <- auto.arima((((na.omit(lacondos$linear_M_CF)))),trace=FALSE,parallel = TRUE,stepwise=FALSE)
+ar_CF_A_linear <- auto.arima((((na.omit(lacondos$linear_A_CF)))),trace=FALSE,parallel = TRUE,stepwise=FALSE)
 
-cbind(lacondos$CF,a_model_nonlinear$trend)
+length((na.omit(lacondos$linear_M_CF)))
+length(((lacondos$linear_M_CF)))
+
+cbind(lacondos$linear_M_CF,a_model_nonlinear$trend)
        
-#plot(ar_CF_linear$residuals)
-#acf(ar_CF_linear$residuals)
-#pacf(ar_CF_linear$residuals)
+#plot(ar_CF_M_linear$residuals)
+#acf(ar_CF_M_linear$residuals)
+#pacf(ar_CF_M_linear$residuals)
 
-ar_CF_linear_forecast <- as.data.frame(as.matrix(forecast(ar_CF_linear)$mean))
+ar_CF_M_linear_forecast <- as.data.frame(as.matrix(forecast(ar_CF_M_linear)$mean))
+ar_CF_A_linear_forecast <- as.data.frame(as.matrix(forecast(ar_CF_A_linear)$mean))
+
 ar_trendcycle_a_nonlinear_forecast <- as.data.frame(as.matrix(forecast(ar_decompose_a_nonlinear)$mean))
 ar_trendcycle_m_nonlinear_forecast <- as.data.frame(as.matrix(forecast(ar_decompose_m_nonlinear)$mean))
 
-nonlinearadditional = length(na.omit(a_model_nonlinear$trend))-length((na.omit(lacondos$CF)))
+nonlinearadditional = length(na.omit(a_model_nonlinear$trend))-length((na.omit(lacondos$linear_M_CF)))
 
-forecastWindow <- nrow(ar_CF_linear_forecast)
+forecastWindow <- nrow(ar_CF_M_linear_forecast)
 nonlinearforecastWindow = forecastWindow + nonlinearadditional
 
-rownames(ar_CF_linear_forecast) <- tail(rownames(lacondos[!complete.cases(lacondos$CF),]),forecastWindow)
-colnames(ar_CF_linear_forecast) <- 'CF_linear_forecast'
+rownames(ar_CF_M_linear_forecast) <- tail(rownames(lacondos[!complete.cases(lacondos$linear_M_CF),]),forecastWindow)
+colnames(ar_CF_M_linear_forecast) <- 'CF_linear_M_forecast'
 
-lacondos$CF[match(rownames(ar_CF_linear_forecast),rownames(lacondos))] = ar_CF_linear_forecast$CF
+rownames(ar_CF_A_linear_forecast) <- tail(rownames(lacondos[!complete.cases(lacondos$linear_A_CF),]),forecastWindow)
+colnames(ar_CF_A_linear_forecast) <- 'CF_linear_A_forecast'
 
-sum(na.omit(ar_CF_linear_forecast$residuals)^2)
+#append multiplicative linear forecast
+lacondos$linear_M_CF[match(rownames(ar_CF_M_linear_forecast),rownames(lacondos))] = ar_CF_M_linear_forecast$CF_linear_M_forecast
+lacondos$linear_A_CF[match(rownames(ar_CF_A_linear_forecast),rownames(lacondos))] = ar_CF_A_linear_forecast$CF_linear_A_forecast
 
-lacondos$forecast_ar_M_linear <- lacondos$CMAT*lacondos$CF*lacondos$`Linear_M_Seasonal_Indexes_Adj`
-lacondos$forecast_ar_A_linear <- lacondos$CMAT+lacondos$CF+lacondos$`Linear_A_Seasonal_Indexes_Adj`
+sum(na.omit(ar_CF_M_linear_forecast$residuals)^2)
+sum(na.omit(ar_CF_A_linear_forecast$residuals)^2)
 
-lacondos$forecast_ar_M_nonlinear <- lacondos$CMAT*lacondos$CF*lacondos$`Linear_M_Seasonal_Indexes_Adj`
-#lacondos$forecast_ar_A_linear <- lacondos$CMAT+lacondos$CF+lacondos$`Linear_M_Seasonal_Indexes_Adj`
+lacondos$forecast_ar_M_linear <- lacondos$CMAT*lacondos$linear_M_CF*lacondos$`Linear_M_Seasonal_Indexes_Adj`
+lacondos$forecast_ar_A_linear <- lacondos$CMAT+lacondos$linear_A_CF+lacondos$`Linear_A_Seasonal_Indexes_Adj`
 
-plot(lacondos$forecast_ar_M_linear)
+#plot(a_model_nonlinear)
+#a_model_nonlinear$seasonal
+
+lacondos$forecast_ar_A_nonlinear <- ts(a_model_nonlinear$trend)+ts(a_model_nonlinear$seasonal)
+lacondos$forecast_ar_M_nonlinear <- ts(m_model_nonlinear$trend)*ts(m_model_nonlinear$seasonal)
+#lacondos$forecast_ar_A_linear <- lacondos$CMAT+lacondos$linear_M_CF+lacondos$`Linear_M_Seasonal_Indexes_Adj`
+
+plot(lacondos$forecast_ar_M_linear,type="l",col="purple")
+lines(lacondos$forecast_ar_A_linear,col="red")
+lines(lacondos[,variable_of_interest],col="black")
 
 View(lacondos)

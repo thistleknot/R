@@ -1,0 +1,167 @@
+```{r}
+#packages
+{
+  packages_github <- c()
+  
+  installed_packages <- packages_github %in% rownames(installed.packages())
+  if (any(installed_packages == FALSE)) {
+    devtools::install_github(packages_github[!installed_packages])
+  }
+  
+  # Packages loading
+  invisible(lapply(sub(".*?/", "", packages_github), library, character.only = TRUE))
+  
+  packages <- c("dplyr","ggplot2","quantmod","zoo","plyr","forecast","tseries","tidyverse","furrr")
+  
+  # Install packages not yet installed
+  installed_packages <- packages %in% rownames(installed.packages())
+  if (any(installed_packages == FALSE)) {
+    install.packages(packages[!installed_packages])
+  }
+  
+  # Packages loading
+  invisible(lapply(packages, library, character.only = TRUE))
+  
+}
+
+```
+
+
+```{r}
+#data
+lacondos <- read.csv("C:/Users/User/Documents/wiki/wiki/Excel/LACondos.csv",row.names=1)
+```
+
+```{r}
+#vars
+
+dates <- as_data_frame(as.Date(rownames(lacondos), format =  "%m/%d/%Y"))
+f = periodicity(dates$value)
+
+fresult = switch(  
+  f$scale,  
+  "monthly"= 12,  
+  "daily"= 252,  
+  "quarterly"= 4,  
+  "weekly"= 52,
+)  
+
+aggresult = switch(  
+  f$scale,  
+  "monthly"= "Month",  
+  "daily"= "Day",  
+  "quarterly"= "Quarter",  
+  "weekly"= "Week",
+)
+
+aset = switch(  
+  f$scale,  
+  "monthly"= c("Month" = "Month"),  
+  "daily"= c("Day" = "Day"),  
+  "quarterly"= c("Quarter" = "Quarter"),  
+  "weekly"= c("Week" = "Week"),
+) 
+
+{
+  training <- nrow(lacondos)*.7
+  validation <- training-round(nrow(lacondos)*.7*.3,0)
+  holdout <- nrow(lacondos)-nrow(lacondos)*.7+validation
+}
+
+#vars
+{
+  variable_of_interest="LXXRCSA"
+  N=nrow(lacondos)
+  alpha = .05
+  significant_threshold=(exp(2*-qnorm((1-alpha)/2)/sqrt(N-3)-1))/(exp(2*-qnorm((1-alpha)/2)/sqrt(N-3)+1))
+}
+
+
+```
+
+```{r}
+timeseries_lacondo = lacondos[,1,drop=FALSE]
+plot(as.ts(timeseries_lacondo))
+```
+
+
+```{r}
+cma_cycle_trend_nonlinear_additive_lacondos = as.data.frame(ma(lacondos, order = fresult, centre=T))
+plot(as.ts(timeseries_lacondo))
+lines(cma_cycle_trend_nonlinear_additive_lacondos)
+```
+
+```{r}
+CF_lm <- lm(V1 ~., data=cbind(1:nrow(cma_cycle_trend_nonlinear_additive_lacondos),cma_cycle_trend_nonlinear_additive_lacondos))
+CMAT_lacondos = CF_lm$fitted.values
+```
+
+```{r}
+CF_multiplicative_lacondos = cma_cycle_trend_nonlinear_additive_lacondos/CMAT_lacondos
+CF_additive_lacondos = cma_cycle_trend_nonlinear_additive_lacondos-CMAT_lacondos
+
+M_SI <- colMeans(t(matrix(as.matrix(timeseries_lacondo/cma_cycle_trend_nonlinear_additive_lacondos),nrow=fresult)),na.rm=TRUE)
+M_SI <- M_SI/mean(M_SI)
+plot(rep(M_SI,fresult),type="l")
+
+A_SI <- colMeans(t(matrix(as.matrix(timeseries_lacondo-cma_cycle_trend_nonlinear_additive_lacondos),nrow=fresult)),na.rm=TRUE)
+A_SI <- A_SI-mean(A_SI)
+plot(rep(A_SI,fresult),type="l")
+```
+
+```{r}
+detrend_nonlinear_additive_lacondos = timeseries_lacondo - cma_cycle_trend_nonlinear_additive_lacondos
+plot(as.ts(detrend_nonlinear_additive_lacondos))
+```
+
+
+```{r}
+seasonal_nonlinear_additive_lacondos = colMeans(t(matrix(as.matrix(detrend_nonlinear_additive_lacondos),nrow=fresult)), na.rm =T)
+plot(as.ts(rep(seasonal_nonlinear_additive_lacondos,fresult)))
+```
+```{r}
+
+```
+
+
+```{r}
+random_nonlinear_additive_lacondos = matrix(ts(timeseries_lacondo,frequency=fresult) - ts(cma_cycle_trend_nonlinear_additive_lacondos,frequency=fresult) - ts(rep(seasonal_nonlinear_additive_lacondos,ceiling(length(ts(timeseries_lacondo,frequency=fresult))/fresult)),frequency=fresult))
+plot(as.ts(random_nonlinear_additive_lacondos))
+```
+
+
+```{r}
+recomposed_nonlinear_additive_lacondos = cma_cycle_trend_nonlinear_additive_lacondos + seasonal_nonlinear_additive_lacondos + random_nonlinear_additive_lacondos
+plot(as.ts(recomposed_nonlinear_additive_lacondos))
+```
+
+
+```{r}
+ts_nonlinear_additive_lacondos = ts(timeseries_lacondo, frequency = fresult)
+decompose_nonlinear_additive_lacondos = decompose(ts_nonlinear_additive_lacondos, "additive")
+plot(as.ts(decompose_nonlinear_additive_lacondos$seasonal))
+plot(as.ts(decompose_nonlinear_additive_lacondos$trend))
+plot(as.ts(decompose_nonlinear_additive_lacondos$random))
+plot(decompose_nonlinear_additive_lacondos)
+```
+
+
+```{r}
+ts_nonlinear_additive_lacondos = ts(timeseries_lacondo, frequency = fresult)
+dim(ts_nonlinear_additive_lacondos)<-NULL
+stl_nonlinear_additive_lacondos = stl(ts_nonlinear_additive_lacondos, "periodic")
+seasonal_stl_nonlinear_additive_lacondos <- stl_nonlinear_additive_lacondos$time.series[,1]
+trend_stl_nonlinear_additive_lacondos <- stl_nonlinear_additive_lacondos$time.series[,2]
+random_stl_nonlinear_additive_lacondos <- stl_nonlinear_additive_lacondos$time.series[,2]
+
+plot(ts_nonlinear_additive_lacondos)
+plot(as.ts(seasonal_stl_nonlinear_additive_lacondos))
+plot(trend_stl_nonlinear_additive_lacondos)
+plot(random_stl_nonlinear_additive_lacondos)
+plot(stl_nonlinear_additive_lacondos)
+```
+
+```{r}
+ 
+```
+
