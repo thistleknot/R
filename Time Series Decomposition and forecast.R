@@ -65,6 +65,10 @@ aset = switch(
   variable_of_interest="LXXRCSA"
   arima_choices = c("arfima","arima")
   arima_choice = arima_choices[1]
+  
+  trend_models = c("linear", "poly", "exp")
+  trend_model = trend_models[2]
+  porder = 12
   N=nrow(lacondos)
   alpha = .05
   significant_threshold=(exp(2*-qnorm((1-alpha)/2)/sqrt(N-3)-1))/(exp(2*-qnorm((1-alpha)/2)/sqrt(N-3)+1))
@@ -80,13 +84,45 @@ class(lacondos$better_CMA) <- class(lacondos$CMA)
 
 CMA_df <- lacondos[,c("time","CMA")][complete.cases(lacondos[,c("time","CMA")]),]
 
-CMA_df_lm <- lm(CMA ~ time, data=CMA_df)
-
-lacondos$CMAT <- 1:nrow(lacondos)*CMA_df_lm$coefficients[2]+CMA_df_lm$coefficients[1]
+if (trend_model=="linear")
+{
   
-lacondos$linear_M_CF <- lacondos$CMA/lacondos$CMAT
-
-lacondos$linear_A_CF <- lacondos$CMA-lacondos$CMAT
+  CMA_df_lm <- lm(CMA ~ time, data=CMA_df) 
+  
+  lacondos$CMAT <- 1:nrow(lacondos)*CMA_df_lm$coefficients[2]+CMA_df_lm$coefficients[1]
+  
+  lacondos$linear_M_CF <- lacondos$CMA/lacondos$CMAT
+  
+  lacondos$linear_A_CF <- lacondos$CMA-lacondos$CMAT
+  
+} else
+if (trend_model == "poly") {
+  y <- CMA_df[,"CMA",drop=TRUE]
+  colnames(y) <- "CMA"
+  
+  q <- poly(CMA_df[,"time",drop=TRUE],porder)
+  
+  newq <- poly(1:nrow(lacondos),porder)
+  
+  CMA_df_lm <- lm(CMA~.,data=as.data.frame(cbind(CMA_df[,"CMA",drop=FALSE],q)))
+  
+  lacondos$CMAT <- predict(CMA_df_lm,newdata=newq,type="response")
+  
+  lacondos$linear_M_CF <- lacondos$CMA/lacondos$CMAT
+  
+  lacondos$linear_A_CF <- lacondos$CMA-lacondos$CMAT
+  
+} else
+{
+  CMA_df_lm <- lm(log(CMA) ~ time, data=CMA_df) 
+  
+  lacondos$CMAT <- exp(1:nrow(lacondos)*CMA_df_lm$coefficients[2]+CMA_df_lm$coefficients[1])
+  
+  lacondos$linear_M_CF <- lacondos$CMA/lacondos$CMAT
+  
+  lacondos$linear_A_CF <- lacondos$CMA-lacondos$CMAT
+  
+}
 
 lacondos$Date <- dates$value
 
@@ -146,6 +182,10 @@ if(any(ac_f$acf>significant_threshold))
 
 a_model_nonlinear <- decompose(ts(lacondos[,1,drop=FALSE],frequency=fresult),type="additive")
 m_model_nonlinear <- decompose(ts(lacondos[,1,drop=FALSE],frequency=fresult),type="multiplicative")
+
+m_model_nonlinear$random
+
+m_model_nonlinear$x/(m_model_nonlinear$trend*m_model_nonlinear$seasonal)
 
 if (arima_choice == "arima")
 {
