@@ -99,6 +99,7 @@ lacondos[,aggresult] = switch(
 ) 
 
 Linear_A_Seasonal_Index <- lacondos[,variable_of_interest] - lacondos$better_CMA
+#head(Linear_A_Seasonal_Index,12)
 colnames(Linear_A_Seasonal_Index) <- "Linear_A_Seasonal_Index"
 Linear_A_Seasonal_Index <- cbind(Linear_A_Seasonal_Index,lacondos[,aggresult,drop=FALSE])
 #colnames(Linear_A_Seasonal_Indexes) <- c("Linear_A_Seasonal_Indexes",aggresult)
