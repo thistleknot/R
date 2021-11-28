@@ -86,7 +86,12 @@ plot(as.ts(timeseries_lacondo))
 
 
 ```{r}
+#ma_nonlinear_additive_lacondos = as.data.frame(ma(lacondos, order = fresult, centre=F))
+#cma_cycle_trend_nonlinear_additive_lacondos = as.data.frame(ma(ma_nonlinear_additive_lacondos, order = fresult/2, centre=F))
 cma_cycle_trend_nonlinear_additive_lacondos = as.data.frame(ma(lacondos, order = fresult, centre=T))
+
+ma(c(1,2,3,4),order = 2, centre=T)
+
 plot(as.ts(timeseries_lacondo))
 lines(cma_cycle_trend_nonlinear_additive_lacondos)
 ```
@@ -166,7 +171,10 @@ plot(decompose_nonlinear_additive_lacondos)
 ```{r}
 ts_nonlinear_additive_lacondos = ts(timeseries_lacondo, frequency = fresult)
 dim(ts_nonlinear_additive_lacondos)<-NULL
-stl_nonlinear_additive_lacondos = stl(ts_nonlinear_additive_lacondos, "periodic")
+stl_nonlinear_additive_lacondos = stl
+
+stl_nonlinear_additive_lacondos = stl(ts_nonlinear_additive_lacondos, "periodic",robust = TRUE)
+
 seasonal_stl_nonlinear_additive_lacondos <- stl_nonlinear_additive_lacondos$time.series[,1]
 trend_stl_nonlinear_additive_lacondos <- stl_nonlinear_additive_lacondos$time.series[,2]
 random_stl_nonlinear_additive_lacondos <- stl_nonlinear_additive_lacondos$time.series[,2]
