@@ -171,7 +171,6 @@ plot(decompose_nonlinear_additive_lacondos)
 ```{r}
 ts_nonlinear_additive_lacondos = ts(timeseries_lacondo, frequency = fresult)
 dim(ts_nonlinear_additive_lacondos)<-NULL
-stl_nonlinear_additive_lacondos = stl
 
 stl_nonlinear_additive_lacondos = stl(ts_nonlinear_additive_lacondos, "periodic",robust = TRUE)
 

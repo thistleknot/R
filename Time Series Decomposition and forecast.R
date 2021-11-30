@@ -10,7 +10,7 @@
   # Packages loading
   invisible(lapply(sub(".*?/", "", packages_github), library, character.only = TRUE))
   
-  packages <- c("dplyr","ggplot2","quantmod","zoo","plyr","forecast","tseries","tidyverse","furrr")
+  packages <- c("dplyr","ggplot2","quantmod","zoo","plyr","forecast","tseries","tidyverse","furrr","lubridate")
   
   # Install packages not yet installed
   installed_packages <- packages %in% rownames(installed.packages())
@@ -357,9 +357,165 @@ lacondos$forecast_ar_M_nonlinear <- ts(m_model_nonlinear$seasonal)*lacondos$`Poi
 rownames(lacondos) <- as.Date(lacondos$date, format="%m/%d/%Y")
 lacondos$date <- rownames(lacondos)
 
+ts_data <- ts(aggregate.ts(ts(na.omit(lacondos[,variable_of_interest,drop=FALSE]),frequency=fresult),mean, nfrequency = 4),start=c(year(lacondos$date[1]),quarter(lacondos$date[1])),frequency=4)
+
+f_ses  <- function(y, h) ses(y,alpha = NULL,h=h,initial="simple")
+f_auto_arima  <- function(y, h) forecast(auto.arima(y), h)
+f_decompose_a  <- function(y, h, f) forecast(decompose(y,frequency=f,type="additive"), h)
+f_decompose_m  <- function(y, h) forecast(auto.arima(y), h)
+f_arfima  <- function(y, h) forecast(arfima(y,estim = c("ls")), h)
+f_ets <- function(y, h) predict(ets(y), h)
+
+if(FALSE)
+{
+  decompose_cycle_factor_a <- function(y,fresult,type_)
+  {#y=as.data.frame(lacondos$LXXRCSA,row.names=lacondos$date)
+    
+    df <- as.data.frame(y)
+    
+    df$date <- rownames(df)
+  
+    initial_decompose <- decompose(ts(y,frequency=fresult),type="additive")
+    
+    df$true_CMA <- as.data.frame(ma(df[,1], order = fresult, centre=T))
+    
+    CMA_df_lm <- lm(df$true_CMA[,1,drop=TRUE] ~ as.integer(rownames(as.data.frame(df[,1])))) 
+    
+    #colnames(df$CMAT)
+    df[,"CMAT"] <- data.frame(1:(nrow(as.data.frame(y)))*CMA_df_lm$coefficients[2]+CMA_df_lm$coefficients[1])
+    
+    df$CF <- as.data.frame(df$true_CMA/df$CMAT)[,1]
+    
+    df$SI <- as.data.frame(df[,1] - df$true_CMA)[,1]
+  
+    #class(df) <- class(lacondos)
+    
+    df[,aggresult] = temp_
+      temp_ <- switch(  
+      f$scale,  
+      "monthly"= months(as.Date(df$date)),
+      #"daily"= lacondos[,aggresult] <- weekdays(dates$value)
+      "quarterly"= quarters(as.Date(df$date)),  
+      #"weekly"= c("Week" = "Week"),
+    ) 
+    
+    #Linear_A_Seasonal_Index 
+    Linear_A_Seasonal_Index <- df[,1] - df$true_CMA
+    colnames(Linear_A_Seasonal_Index) <- "Linear_A_Seasonal_Index"
+    Linear_A_Seasonal_Index$Month <- df$Month
+    #head(Linear_A_Seasonal_Index,12)
+    
+    Linear_A_Seasonal_Index <- cbind(Linear_A_Seasonal_Index,df[,1,drop=FALSE])
+    #colnames(Linear_A_Seasonal_Indexes) <- c("Linear_A_Seasonal_Indexes",aggresult)
+    
+    f1 <- as.formula(paste("Linear_A_Seasonal_Index", " ~ ", aggresult))
+    
+    Linear_A_Seasonal_Indexes <- aggregate(f1, na.omit(Linear_A_Seasonal_Index) , mean)
+    
+    Linear_A_Seasonal_Indexes_Adj <- Linear_A_Seasonal_Indexes[,"Linear_A_Seasonal_Index",drop=FALSE]-mean(Linear_A_Seasonal_Indexes[,"Linear_A_Seasonal_Index"])
+    colnames(Linear_A_Seasonal_Indexes_Adj) <- "Linear_A_Seasonal_Indexes_Adj"
+    rownames(Linear_A_Seasonal_Indexes_Adj) <- Linear_A_Seasonal_Indexes[,aggresult]
+    
+    Linear_A_Seasonal_Indexes$Linear_A_Seasonal_Indexes_Adj = Linear_A_Seasonal_Indexes_Adj
+    
+    Linear_A_Seasonal_Indexes_Adj[,aggresult] = Linear_A_Seasonal_Indexes[,aggresult]
+    
+    df$SI_Adj <- left_join(df,Linear_A_Seasonal_Indexes_Adj, by = aset) %>% select(Linear_A_Seasonal_Indexes_Adj)
+    
+    df$true_CMA <- df$true_CMA[,1]
+    
+    df$SI
+    
+    df$SI_Adj <- df$SI_Adj[,1]
+    
+    View(df)
+    
+    df$CF
+    
+    temp_df <- na.omit(as.data.frame(df$CF))
+    rownames(temp_df) <- as.integer(rownames(temp_df))+fresult/2 
+      
+    CF_fore <- forecast(auto.arima(temp_df))
+    
+    temp <- CF_fore$model$x
+  
+    
+    
+    View(CF_fore)
+    
+    #rownames(CF_fore) <- 
+  }
+}
+
+#5 CV folds
+window_ = ceiling(nrow(matrix(ts_data))/5*4)
+h_ = fresult
+
+models_tsCV = list(
+  tsCV(ts_data, naive, h=h_, window = window_),
+  tsCV(ts_data, f_ses, h=h_, window = window_),
+  tsCV(ts_data, holt, h=h_, window = window_),
+  tsCV(ts_data, holt, damped = TRUE, h = h_, window = window_),
+  tsCV(ts_data, hw, seasonal = "additive", h=h_, window = window_),
+  tsCV(ts_data, hw, seasonal = "additive", damped=TRUE, h=h_, window = window_),
+  tsCV(ts_data, hw, seasonal = "multiplicative", h=h_, window = window_),
+  tsCV(ts_data, hw, seasonal = "multiplicative", damped=TRUE, h=h_, window = window_),
+  tsCV(ts_data, f_auto_arima, h=h_, window = window_),
+  tsCV(ts_data, f_arfima, h=1,window = window_),
+  tsCV(ts_data, f_ets, h=h_, window = window_)
+)
+
+errors_tsCV = array(0,dim=c(length(models_tsCV),1))
+
+c_ = 1
+for (m in models_tsCV)
+{
+  errors_tsCV[c_] = mean(m^2, na.rm = TRUE)
+  c_ = c_ + 1
+}
+
+print(errors_tsCV)
+
+models = list(
+  naive(ts_data, h=h_),
+  f_ses <- ses(ts_data,h=h_),
+  holt(ts_data,h=h_),
+  holt(ts_data, damped=TRUE,h=h_),
+  hw(ts_data, seasonal = "additive",h=h_),
+  hw(ts_data, seasonal = "additive", damped=TRUE,h=h_),
+  hw(ts_data, seasonal = "multiplicative",h=h_),
+  hw(ts_data, seasonal = "multiplicative", damped=TRUE,h=h_),
+  f_auto_arima(ts_data, h=h_),
+  f_arfima(ts_data, h=h_),
+  f_ets(ts_data,h=h_)
+)
+
+model_scores <- array(0,dim=c(length(models),8))
+
+for (m in 1:length(models))
+{
+  print(m)
+  model_scores[m,1] = if(is.null(models[m][[1]]$method)){"arima"}else{models[m][[1]]$method}
+  model_scores[m,2:8] = c(accuracy(models[m][[1]]))
+}
+
+colnames(model_scores) <- c("name","ME","RMSE","MAE","MPE","MAPE","MASE","ACF1")
+#View(model_scores)
+
+models[[which.min(errors_tsCV)]] -> fc1
+models[[1]] -> fc2
+autoplot(ts_data, series="Data") +
+  autolayer(fc1, series = "Alpha = 0.1") +
+  #autolayer(fc2, series="Forecast") +
+  autolayer(fitted(fc1), series="Fitted")
+
+
+#winters_m <- HoltWinters(ts(na.omit(lacondos[,variable_of_interest,drop=TRUE]),frequency = fresult),seasonal=c("multiplicative"))
+
 par(mar=c(7, 4, 4, 2) + 0.1, bg="white", cex=1) 
 my.dates <- as.Date(rownames(lacondos))
 plot(my.dates,lacondos[,variable_of_interest], xlab="", las=1, col="steelblue", pch=20, xaxt="n")
+
 lines(my.dates,lacondos$forecast_ar_M_linear, xlab="", las=1, col="purple", pch=20, xaxt="n",type="l")
 lines(my.dates,lacondos$forecast_ar_M_linear_upper, xlab="", las=1, col="purple", pch=20, xaxt="n",type="p")
 lines(my.dates,lacondos$forecast_ar_M_linear_lower, xlab="", las=1, col="purple", pch=20, xaxt="n",type="p")
@@ -367,7 +523,7 @@ lines(my.dates,lacondos$forecast_ar_M_linear_lower, xlab="", las=1, col="purple"
 lines(my.dates,lacondos$forecast_ar_A_linear, xlab="", las=1, col="red", pch=20, xaxt="n",type="l")
 lines(my.dates,lacondos$forecast_ar_A_linear_upper, xlab="", las=1, col="red", pch=20, xaxt="n",type="p")
 lines(my.dates,lacondos$forecast_ar_A_linear_lower, xlab="", las=1, col="red", pch=20, xaxt="n",type="p")
-
+'
 lines(my.dates,lacondos$forecast_ar_A_nonlinear, xlab="", las=1, col="green", pch=20, xaxt="n",type="l")
 lines(my.dates,lacondos$forecast_ar_A_nonlinear_upper, xlab="", las=1, col="green", pch=20, xaxt="n",type="p")
 lines(my.dates,lacondos$forecast_ar_A_nonlinear_lower, xlab="", las=1, col="green", pch=20, xaxt="n",type="p")
@@ -375,7 +531,7 @@ lines(my.dates,lacondos$forecast_ar_A_nonlinear_lower, xlab="", las=1, col="gree
 lines(my.dates,lacondos$forecast_ar_M_nonlinear, xlab="", las=1, col="black", pch=20, xaxt="n",type="l")
 lines(my.dates,lacondos$forecast_ar_M_nonlinear_upper, xlab="", las=1, col="black", pch=20, xaxt="n",type="p")
 lines(my.dates,lacondos$forecast_ar_M_nonlinear_lower, xlab="", las=1, col="black", pch=20, xaxt="n",type="p")
-
+'
 axis.Date(1, at=seq(my.dates[1], my.dates[length(my.dates)], "years"),
           labels=seq(my.dates[1], my.dates[length(my.dates)], "years"),
           format= "%Y-%m-%d", las=2)
