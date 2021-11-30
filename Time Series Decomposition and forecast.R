@@ -502,13 +502,18 @@ for (m in 1:length(models))
 colnames(model_scores) <- c("name","ME","RMSE","MAE","MPE","MAPE","MASE","ACF1")
 #View(model_scores)
 
+
 models[[which.min(errors_tsCV)]] -> fc1
 models[[1]] -> fc2
-autoplot(ts_data, series="Data") +
-  autolayer(fc1, series = "Alpha = 0.1") +
-  #autolayer(fc2, series="Forecast") +
-  autolayer(fitted(fc1), series="Fitted")
 
+fc1 %>% forecast(h = fresult) %>% autoplot() +
+  autolayer(fitted(fc1), series="Fitted") +
+  autolayer(ts_data, series="Data")
+  
+'
+autoplot(ts_data, series="Data") +
+  autolayer(fitted(fc1), series="Fitted")
+'
 
 #winters_m <- HoltWinters(ts(na.omit(lacondos[,variable_of_interest,drop=TRUE]),frequency = fresult),seasonal=c("multiplicative"))
 
