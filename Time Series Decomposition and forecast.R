@@ -366,11 +366,16 @@ f_decompose_m  <- function(y, h) forecast(auto.arima(y), h)
 f_arfima  <- function(y, h) forecast(arfima(y,estim = c("ls")), h)
 f_ets <- function(y, h) predict(ets(y), h)
 
+as.data.frame(ts(aggregate.ts(ts(na.omit(lacondos[,variable_of_interest,drop=FALSE]),frequency=fresult),mean, nfrequency = 4),start=c(year(lacondos$date[1]),quarter(lacondos$date[1])),frequency=4))
+
+as.data.frame(ts(aggregate.ts(ts(na.omit(lacondos[,variable_of_interest,drop=FALSE]),frequency=fresult),mean, nfrequency = 4),start=c(year(lacondos$date[1]),quarter(lacondos$date[1])),frequency=4))
+
 if(FALSE)
 {
-  decompose_cycle_factor_a <- function(y,fresult,type_)
-  {#y=as.data.frame(lacondos$LXXRCSA,row.names=lacondos$date)
-    
+                        
+  decompose_cycle_factor_a <- function(y,fresult)
+  {#y=data_ = as.data.frame(ts_data,row.names=as.Date(as.yearqtr(index(ts_data), format = "Q%q/%y"), frac = 0))
+    fresult = 4
     df <- as.data.frame(y)
     
     df$date <- rownames(df)
@@ -384,7 +389,7 @@ if(FALSE)
     #colnames(df$CMAT)
     df[,"CMAT"] <- data.frame(1:(nrow(as.data.frame(y)))*CMA_df_lm$coefficients[2]+CMA_df_lm$coefficients[1])
     
-    df$CF <- as.data.frame(df$true_CMA/df$CMAT)[,1]
+    df$CF <- as.data.frame(df$true_CMA-df$CMAT)[,1]
     
     df$SI <- as.data.frame(df[,1] - df$true_CMA)[,1]
   
@@ -427,24 +432,32 @@ if(FALSE)
     df$SI
     
     df$SI_Adj <- df$SI_Adj[,1]
+
+    #View(df)
     
-    View(df)
-    
-    df$CF
-    
-    temp_df <- na.omit(as.data.frame(df$CF))
-    rownames(temp_df) <- as.integer(rownames(temp_df))+fresult/2 
+    #temp_df <- na.omit(as.data.frame(df$CF))
+    #rownames(temp_df) <- as.integer(rownames(temp_df))+fresult/2 
       
-    CF_fore <- forecast(auto.arima(temp_df))
+    CF_fore <- as.data.frame(forecast(auto.arima(df$CF),h = (fresult+fresult/2)))
     
-    temp <- CF_fore$model$x
-  
+    rownames(CF_fore) <- head(as.Date(tail(rownames(na.omit(df[,"CF",drop=FALSE])),1))+months((1:(nrow(CF_fore)))*(fresult-1)),nrow(CF_fore))
     
+    CF_fore$date <- rownames(CF_fore)
+    CF_fore$Month <- months(as.Date(CF_fore$date))
+    #class(CF_fore$months)
     
-    View(CF_fore)
+    CF_fore$SI <- left_join(CF_fore,Linear_A_Seasonal_Indexes_Adj, by = aset) %>% select(Linear_A_Seasonal_Indexes_Adj)
     
-    #rownames(CF_fore) <- 
+    CF_fore[,"CMAT"] <- data.frame((as.integer(tail(rownames(na.omit(tail(as.data.frame(df$CF),fresult))),1))+1):((as.integer(tail(rownames(na.omit(tail(as.data.frame(df$CF),fresult))),1))+1)+((nrow(CF_fore)))-1)*CMA_df_lm$coefficients[2]+CMA_df_lm$coefficients[1])
+      
+    fore_ <- cbind(CF_fore[,1,drop=FALSE]+CF_fore[,"SI",drop=FALSE]+CF_fore[,"CMAT",drop=FALSE],CF_fore[,2,drop=FALSE]+CF_fore[,"SI",drop=FALSE]+CF_fore[,"CMAT",drop=FALSE],CF_fore[,3,drop=FALSE]+CF_fore[,"SI",drop=FALSE]+CF_fore[,"CMAT",drop=FALSE],CF_fore[,4,drop=FALSE]+CF_fore[,"SI",drop=FALSE]+CF_fore[,"CMAT",drop=FALSE],CF_fore[,5,drop=FALSE]+CF_fore[,"SI",drop=FALSE]+CF_fore[,"CMAT",drop=FALSE])
+    colnames(fore_) <- colnames(CF_fore[,1:5])
+    return(tail(fore_,-(fresult/2)))
   }
+  data_ = as.data.frame(ts_data,row.names=as.Date(as.yearqtr(index(ts_data), format = "Q%q/%y"), frac = 0))
+  
+  decompose_cycle_factor_a(data_,4)
+  
 }
 
 #5 CV folds
