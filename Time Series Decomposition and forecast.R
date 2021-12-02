@@ -23,6 +23,17 @@
   
 }
 
+test <- decompose(ts(lacondos[,"LXXRCSA",drop=FALSE],frequency=fresult),"additive")
+
+test$t_ <- lm(matrix(test$trend,ncol=1) ~ matrix(1:nrow(lacondos[,"LXXRCSA",drop=FALSE]),ncol=1))
+test$t_trend <- ts(test$t_$fitted.values,frequency=fresult)
+test$CF <- ts((test$trend-test$t_trend),frequency=fresult)
+plot(test$CF)
+
+#recomposed = test$t_trend + test$seasonal + test$CF
+
+#forecast(auto.arima(test$CF))
+
 plan(multisession, workers = 4)
 
 lacondos <- read.csv("C:/Users/User/Documents/wiki/wiki/Excel/LACondos.csv",row.names=1)
