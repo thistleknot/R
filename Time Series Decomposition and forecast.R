@@ -99,10 +99,9 @@ lacondos[,aggresult] = switch(
   #"weekly"= c("Week" = "Week"),
 ) 
 
-decompose_cycle_factor <- function(y,fresult,type_,trend_)
+decompose_cycle_factor <- function(y,type_,trend_)
 {#y=as.data.frame(as.data.frame(na.omit(lacondos$LXXRCSA)),row.names=na.omit(lacondos[,c("LXXRCSA","date")])$date)
   #type_="additive"
-  #fresult = 12
   #trend_="linear"
   
   dates <- as_data_frame(as.Date(rownames(y)))
@@ -137,8 +136,7 @@ decompose_cycle_factor <- function(y,fresult,type_,trend_)
   df$date <- rownames(df)
   colnames(df) <- c(variable_of_interest,"date")
   
-  df$true_CMA <- as.data.frame(ma(df[,1], order = fresult, centre=T))
-  
+  df[,"true_CMA"] <- as.data.frame(ma(df[,1], order = fresult, centre=T))
   
   #true_CMA = centered average halving tail months (13 months)
   #CMA is Dr. Zerom's centered average using only 12 months, then 6 months
@@ -164,34 +162,32 @@ decompose_cycle_factor <- function(y,fresult,type_,trend_)
   if (trend_=="linear")
   {
    
-    CMA_df_lm <- lm(df$true_CMA[,1,drop=TRUE] ~ as.integer(rownames(as.data.frame(df[,1])))) 
+    CMA_df_lm <- lm(df[,"true_CMA",drop=TRUE] ~ as.integer(rownames(as.data.frame(df[,1])))) 
     
     df[,"CMAT"] <- data.frame(1:(nrow(as.data.frame(y)))*CMA_df_lm$coefficients[2]+CMA_df_lm$coefficients[1])
     
   } else
     if (trend_model == "poly") {
-      y <- CMA_df[,"true_CMA",drop=TRUE]
-      colnames(y) <- "true_CMA"
       
-      q <- poly(CMA_df[,"time",drop=TRUE],porder)
+      y_ <- df[,"true_CMA",drop=FALSE]
+      colnames(y_) <- "true_CMA"
       
-      newq <- poly(1:(nrow(lacondos)+forecastWindow),porder)
+      q <- poly(index(df[,"date",drop=TRUE]),porder,raw=TRUE)
       
-      CMA_df_lm <- lm(true_CMA~.,data=as.data.frame(cbind(CMA_df[,"true_CMA",drop=FALSE],q)))
+      #newq <- poly(1:(nrow(lacondos)+forecastWindow),porder)
       
-      temp_df <- as.data.frame(predict(CMA_df_lm,newdata=newq,type="response"))
+      CMA_df_lm <- lm(y_[,1]~.,data=as.data.frame(cbind(df[,"true_CMA",drop=FALSE],q)))
+      
+      #poly(1:(nrow(lacondos)+forecastWindow),porder)
+      
+      # <- #predict(CMA_df_lm,data=index(df[,"date",drop=TRUE]),type="response")#poly(1:(nrow(lacondos)+forecastWindow),porder)
+      
+      temp_df <- as.data.frame(predict(CMA_df_lm,data=index(df[,"date",drop=TRUE]),type="response"))
       
       colnames(temp_df) <- "CMAT"
-      
-      temp_df$time <- rownames(temp_df)
-      
-      temp_df_ <- merge(lacondos, temp_df, by="time", all=TRUE) 
-      
-      lacondos <- temp_df_[order(as.numeric(temp_df_$time)),]
-      
-      lacondos$linear_M_CF <- lacondos$true_CMA/lacondos$CMAT
-      
-      lacondos$linear_A_CF <- lacondos$true_CMA-lacondos$CMAT
+      #View(temp_df)
+      df[,"CMAT"] <- merge(df, temp_df, by=0, all=TRUE) %>% select(CMAT)
+
       
     } else
     {
@@ -249,10 +245,10 @@ decompose_cycle_factor <- function(y,fresult,type_,trend_)
   
   if(type_=="additive")
   {
-    Linear_Seasonal_Index <- df[,1] - df$true_CMA
+    Linear_Seasonal_Index <- df[,1,drop=FALSE] - df[,"true_CMA",drop=FALSE]
   }else
   {
-    Linear_Seasonal_Index <- df[,1] / df$true_CMA
+    Linear_Seasonal_Index <- df[,1,drop=FALSE] / df[,"true_CMA",drop=FALSE]
   }
   colnames(Linear_Seasonal_Index) <- "Linear_Seasonal_Index"
   Linear_Seasonal_Index$Month <- df$Month
@@ -315,7 +311,7 @@ lacondos$date <- rownames(lacondos)
 #data_ = as.data.frame(ts_data,row.names=as.Date(as.yearqtr(index(ts_data), format = "Q%q/%y"), frac = 0))
 data_ = as.data.frame(as.data.frame(na.omit(lacondos$LXXRCSA)),row.names=na.omit(lacondos[,c("LXXRCSA","date")])$date)
 
-forecast_ <- decompose_cycle_factor(data_,12,"multiplicative","linear")
+forecast_ <- decompose_cycle_factor(data_,"multiplicative","linear")
 
 dm <- as.data.frame(cbind(as.Date(rownames(forecast_, "%m/%d/%Y")),forecast_[,1]))
 colnames(dm) <- c("date","forecast")
