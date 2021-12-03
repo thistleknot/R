@@ -2,7 +2,7 @@ library(forecast)
 
 var_of_int <- "MSPUS"
 
-combo <- read.csv("C:/Users/User/Documents/wiki/wiki/dev/python/Python-Stock/data/deltas.csv",row.names=1)
+combo <- read.csv("C:/Users/User/Documents/wiki/wiki/dev/python/Python-Stock/data/deltas.csv",row.names=1,header=TRUE)
 
 critical.r <- function( n, alpha = .05 ) {
   df <- n - 2
@@ -21,11 +21,9 @@ lags <- c()
   holdout <- combo[floor(nrow(combo)-nrow(combo)*.7+validation):nrow(combo),]
 }
 
-
-
-for(c in 2:(length(colnames(training))))
+for(c in 1:(length(colnames(training))))
 {#c=3
-  
+
       ccf1 <- ccf(training[,var_of_int,drop=FALSE],training[,c], lag = 4, correlation=TRUE, p1=TRUE)
   
       upperCI <- qnorm((1+0.95)/2)/sqrt(ccf1$n.used)
@@ -80,17 +78,17 @@ summary(lm_)
 
 checkresiduals(lm_$residuals)
 
-test_1 <- auto.arima(lm_$model[,var_of_int,drop=FALSE])
+test_1 <- auto.arima(lm_$residuals)
 
-f_1 <- as.data.frame(forecast(test_1,h=horizon))
+f_1 <- as.data.frame(forecast(test_1,h=horizon)+lm_$fitted.values)
 
 rownames(f_1) <- as.integer(rownames(f_1))+abs(as.integer(rownames(f_1))-nrow(training))[1]+1
 
 error_1 <- mean(abs(f_1[,1]- newDF_h[,var_of_int][1:nrow(f_1)]))
 
-test_2 <- auto.arima(lm_$model[,var_of_int,drop=FALSE], xreg = as.matrix(na.omit(newDF_t[,colnames(lm_$model)[2:length(colnames(lm_$model))]])))
+test_2 <- auto.arima(lm_$model[,var_of_int,drop=FALSE], xreg = as.matrix(na.omit(newDF_t[,colnames(lm_$model)[1:length(colnames(lm_$model))]])))
 
-f_2 <- as.data.frame(forecast(test_2, h=horizon, xreg = as.matrix(newDF_h[1:horizon,colnames(lm_$model)[2:length(colnames(lm_$model))]])))
+f_2 <- as.data.frame(forecast(test_2, h=horizon, xreg = as.matrix(newDF_h[1:horizon,colnames(lm_$model)[1:length(colnames(lm_$model))]])))
 
 rownames(f_2) <- as.integer(rownames(f_2))+abs(as.integer(rownames(f_2))-nrow(training))[1]+1
 
