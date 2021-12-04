@@ -1,7 +1,7 @@
 ```{r}
 #packages
 {
-packages <- c("dplyr","ggplot2","quantmod","zoo","plyr","forecast","tseries","tidyverse","furrr","lubridate","anytime","car","caret","ppcor","TSA","corrplot")
+packages <- c("dplyr","ggplot2","quantmod","zoo","plyr","forecast","tseries","tidyverse","furrr","lubridate","anytime","car","caret","ppcor","whitening","TSA","corrplot")
 
 # Install packages not yet installed
 installed_packages <- packages %in% rownames(installed.packages())
@@ -71,7 +71,10 @@ seasonal = switch(
   "weekly"= 52,
 )  
 
-var_of_int <- "MSPUS"
+#plot(raw$GDPC1)
+#var_of_int <- "MSPUS"
+var_of_int <- "GDPC1"
+
 ```
 
 ```{r}
@@ -122,6 +125,11 @@ for (n in 1:(length(colnames(combo_s))))
 {
   #print(n)
   d_ <- ndiffs(combo_s[,n])
+  #min 1 to ensure I'm being consisten (i.e. measuring rate of change between quarters)
+  if(d_ == 0)
+  {
+    d_ = 1
+    }
   
   ndif_ <- c(ndif_,d_)
 }
@@ -131,16 +139,19 @@ combo_d <- data.frame(matrix(ncol = 1, nrow = nrow(raw)))
 for (d in 1:length(ndif_))
 {#d=1
   #print(ndif_[d])
+  '
   if(ndif_[d] == 0)
   {
     #print("TRUE")
     #combo_d <- cbind(combo_d,combo_s[,d,drop=FALSE])
-    #min 1 to ensure I'm being consisten (i.e. measuring rate of change between quarters)
+    
     temp <- combo_s[,d,drop=FALSE]
     temp <- as.data.frame(unlist(lapply((temp-dplyr::lag(temp,1)),function(x){ifelse(is.nan(x),return(0),return(x))})))
     colnames(temp) <- colnames(combo_s[,d,drop=FALSE])
     rownames(temp) <- rownames(combo_s[,d,drop=FALSE])
+    combo_d <- cbind(combo_d,temp)
   }else
+  '
   {
     temp <- combo_s[,d,drop=FALSE]
     for(dif in 1:ndif_[d])
@@ -204,16 +215,24 @@ if(FALSE)
   for (d in 1:length(ndif_))
   {#d=53
     #print(ndif_[d])
+    '
     if(ndif_[d] == 0)
     {
       #print("TRUE")
-      combo_d_m <- cbind(combo_d_m,combo_s_m[,d,drop=FALSE])
+      #combo_d_m <- cbind(combo_d_m,combo_s_m[,d,drop=FALSE])
+      temp <- combo_s_m[,d,drop=FALSE]
+      temp <- as.data.frame(unlist(1+lapply((temp-dplyr::lag(temp,1)),function(x){ifelse(is.nan(x),return(0),return(x))})))
+      colnames(temp) <- colnames(combo_s_m[,d,drop=FALSE])
+      rownames(temp) <- rownames(combo_s_m[,d,drop=FALSE])
+      combo_d_m <- cbind(combo_d_m,temp)
     }else
+    '
     {
       temp <- combo_s_m[,d,drop=FALSE]
       for (dif in 1:ndif_[d])
       {
-        temp <- (1+((temp-dplyr::lag(temp,1))/dplyr::lag(temp,1)))
+        temp <- as.data.frame(unlist(1+lapply((temp-dplyr::lag(temp,1)),function(x){ifelse(is.nan(x),return(0),return(x))})))
+          #(1+((temp-dplyr::lag(temp,1))/dplyr::lag(temp,1)))
       }
       
       combo_d_m <- cbind(combo_d_m,temp)
@@ -307,7 +326,7 @@ for(c in 1:(length(colnames(training))))
 }
 
 #lag example
-cor(na.omit(cbind(training[,var_of_int,],dplyr::lag(training[,"SHY"],2))))
+#cor(na.omit(cbind(training[,var_of_int,],dplyr::lag(training[,"SHY"],2))))
 
 ```
 ```{r}
@@ -351,11 +370,20 @@ max_pvalue = 1
 
 subset = newDF_t[,c(colnames(newDF_t) %notin% c(exclude))]
 
-set_ = subset[,c(colnames(newDF_t) %notin% c(var_of_int))]
+subset_w <- cbind(subset[,var_of_int,drop=FALSE],as.data.frame(whiten(as.matrix(subset[,c(colnames(newDF_t) %notin% c(var_of_int))]), method=c("ZCA"))))
+
+colnames(subset_w) <- colnames(subset)
+rownames(subset_w) <- rownames(subset)
+
+corrplot(cor(subset_w))
+
+set_ = subset_w[,c(colnames(newDF_t) %notin% c(var_of_int))]
 
 while(max_pvalue>=p_threshold)
 {
-  p_values  <- (2 * (1 - pnorm(abs(PCOR(subset)[,var_of_int,drop=FALSE]), mean = 0, sd = 1/sqrt(nrow(subset)))))
+  p_values  <- (2 * (1 - pnorm(abs(cor(subset_w)[,var_of_int,drop=FALSE]), mean = 0, sd = 1/sqrt(nrow(subset)))))
+  #p_values  <- (2 * (1 - pnorm(abs(PCOR(subset)[,var_of_int,drop=FALSE]), mean = 0, sd = 1/sqrt(nrow(subset)))))
+  
   #pcor(subset, method = c("spearman"))$p.value[,var_of_int,drop=FALSE]
   
   max_pname = rownames(p_values)[which.max(p_values)]
@@ -365,7 +393,13 @@ while(max_pvalue>=p_threshold)
   {
     print(max_pvalue)
     print(max_pname)
-    subset <- dplyr::select(subset,-c(max_pname))
+    temp <- dplyr::select(subset_w,-c(max_pname))
+    temp_ <- cbind(subset_w[,var_of_int,drop=FALSE],as.data.frame(whiten(as.matrix(temp[,c(colnames(temp) %notin% c(var_of_int))]), method=c("ZCA"))))
+      
+  colnames(temp_) <- colnames(temp)
+  rownames(temp_) <- rownames(temp)
+  subset_w <- temp_
+
     
   }
 }
@@ -373,7 +407,7 @@ while(max_pvalue>=p_threshold)
 winners = rownames(p_values)[rownames(p_values) %notin% c(var_of_int)]
 sig_table = sig_table + as.integer(colnames(newDF_t) %in% winners)
 
-t_ <- t(pcor(subset[,c(var_of_int,winners)], method = c("spearman"))$estimate[,var_of_int,drop=FALSE])[,-1]
+#t_ <- t(pcor(subset[,c(var_of_int,winners)], method = c("spearman"))$estimate[,var_of_int,drop=FALSE])[,-1]
 
 corrplot(PCOR(subset[,c(var_of_int,winners)]))
 '
@@ -388,11 +422,17 @@ signs_table = signs_table_ + signs_table
 keepers = winners #colnames(sig_table)[sig_table>=(length(folds$train)/2)]
 '
 
-differences <- as.data.frame(rbind(sndif_[which(match(colnames(raw),c(var_of_int,winners))>0)],ndif_[which(match(colnames(raw),c(var_of_int,winners))>0)]))
+as.data.frame(rbind(sndif_[which(match(colnames(raw),c(var_of_int,winners))>0)],ndif_[which(match(colnames(raw),c(var_of_int,winners))>0)]))
+
+differences <- as.data.frame(rbind(c(0,lags[which(match(names,c(var_of_int,winners))>0)]),sndif_[which(match(colnames(raw),c(var_of_int,winners))>0)],ndif_[which(match(colnames(raw),c(var_of_int,winners))>0)]))
+
+#cbind(names[which(match(names,c(var_of_int,winners))>0)],
+
+#lags[which(match(colnames(raw),c(var_of_int,winners))>0)]
 colnames(differences) <- c(var_of_int,winners)
 
-rownames(differences) <- c("seasonal","nonseasonal")
-differences
+rownames(differences) <- c("lags","seasonal","nonseasonal")
+print(differences)
 
 for(h in c(var_of_int,winners))
 {
