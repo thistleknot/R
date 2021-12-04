@@ -49,13 +49,19 @@ combo_s <- data.frame(matrix(ncol = 1, nrow = nrow(raw)))
 
 for (d in 1:length(sndif_))
 {#d=1
+  print(d)
   #print(d)
   if(sndif_[d]*seasonal == 0)
   {
     combo_s <- cbind(combo_s,raw[,d,drop=FALSE])
   }else
   {
-    combo_s <- cbind(combo_s,raw[,d,drop=FALSE]-dplyr::lag(raw[,d,drop=FALSE],sndif_[d]*seasonal))
+    temp <- raw[,d,drop=FALSE]
+    for(dif in 1:sndif_[d])
+    {
+      temp <- temp-dplyr::lag(temp,1*seasonal)
+    }
+    combo_s <- cbind(combo_s,temp)
   }
   
 }
@@ -90,14 +96,64 @@ for (d in 1:length(ndif_))
     combo_d <- cbind(combo_d,combo_s[,d,drop=FALSE])
   }else
   {
-    combo_d <- cbind(combo_d,(combo_s[,d,drop=FALSE]-dplyr::lag(combo_s[,d,drop=FALSE],1)))
+    temp <- combo_s[,d,drop=FALSE]
+    for(dif in 1:ndif_[d])
+    {
+      temp <- temp-dplyr::lag(temp,1)
+      
+    }
+    combo_d <- cbind(combo_d,temp)
   }
-  
 }
 
 combo_d = subset(combo_d, select = -c(1) )
 
 rownames(combo_d) <- rownames(raw)
+
+View(combo_d)
+
+combo_s_m <- data.frame(matrix(ncol = 1, nrow = nrow(raw)))
+
+for (d in 1:length(sndif_))
+{#d=1
+  #print(d)
+  if(sndif_[d]*seasonal == 0)
+  {
+    combo_s_m <- cbind(combo_s_m,raw[,d,drop=FALSE])
+  }else
+  {
+    combo_s_m <- cbind(combo_s_m,1+(((raw[,d,drop=FALSE]-dplyr::lag(raw[,d,drop=FALSE],sndif_[d]*seasonal))/dplyr::lag(raw[,d,drop=FALSE],sndif_[d]*seasonal))))
+  }
+  
+}
+
+combo_s_m = subset(combo_s_m, select = -c(1) )
+
+rownames(combo_s_m) <- rownames(raw)
+
+#View(combo_s_m)
+
+combo_d_m <- data.frame(matrix(ncol = 1, nrow = nrow(raw)))
+
+for (d in 1:length(ndif_))
+{
+  #print(d)
+  if(ndif_[d] == 0)
+  {
+    #print("TRUE")
+    combo_d_m <- cbind(combo_d_m,combo_s_m[,d,drop=FALSE])
+  }else
+  {
+    combo_d_m <- cbind(combo_d_m,log10(1+(combo_s_m[,d,drop=FALSE]-dplyr::lag(combo_s[,d,drop=FALSE],1))/dplyr::lag(combo_s[,d,drop=FALSE],1)))
+  }
+  
+}
+
+combo_d_m = subset(combo_d_m, select = -c(1) )
+
+rownames(combo_d_m) <- rownames(raw)
+
+View(combo_d_m)
 
 #ncol(combo_d)
 
@@ -108,12 +164,20 @@ rownames(combo_d) <- rownames(raw)
 names <- c()
 lags <- c()
 
-combo_ <- na.omit(combo_d)
+
+numZero <- colSums(combo_d == 0, na.rm = T)
+
+limit = (nrow(raw)/2)
+drops = names(which(numZero>=limit))
+
+#lapply(combo_d, function(x){ length(which(x==0))/length(x)})
+
+combo_ <- na.omit(dplyr::select(combo_d, -c(drops)))
 
 {
   training <- combo_[1:floor(nrow(combo_)*.7),]
   #validation <- training-round(nrow(combo_)*.7*.3,0)
-  holdout <- combo_[floor(nrow(combo_)-nrow(combo_)*.7+validation):nrow(combo_),]
+  holdout <- combo_[(nrow(training)+1):nrow(combo_),]
 }
 
 for(c in 1:(length(colnames(training))))
@@ -165,7 +229,7 @@ colnames(sig_table) <- colnames(newDF_t)
 signs_table = matrix(0, ncol=ncol(newDF_t))
 colnames(signs_table) <- colnames(newDF_t)
 
-p_threshold = .05
+p_threshold = .33
 
 New_Names = colnames(newDF_t)[2:length(colnames(newDF_t))]
 iteration=0
@@ -189,15 +253,16 @@ for (k in 1:length(folds$train))
   
   set_ = subset[,c(colnames(newDF_t) %notin% c(var_of_int))]
   
-  while(max_pvalue>=.05)
+  while(max_pvalue>=p_threshold)
   {
-    p_values  <- pcor(subset)$p.value[,var_of_int,drop=FALSE]
+    p_values  <- pcor(subset, method = c("spearman"))$p.value[,var_of_int,drop=FALSE]
     
     max_pname = rownames(p_values)[which.max(p_values)]
     max_pvalue = p_values[max_pname,]
     
-    if (max_pvalue >= .05)
+    if (max_pvalue >= p_threshold)
     {
+      print(max_pvalue)
       print(max_pname)
       subset <- dplyr::select(subset,-c(max_pname))
       
@@ -207,7 +272,7 @@ for (k in 1:length(folds$train))
   winners = rownames(p_values)[rownames(p_values) %notin% c(var_of_int)]
   sig_table = sig_table + as.integer(colnames(newDF_t) %in% winners)
   
-  t_ <- t(pcor(subset[,c(var_of_int,winners)])$estimate[,var_of_int,drop=FALSE])[,-1]
+  t_ <- t(pcor(subset[,c(var_of_int,winners)], method = c("spearman"))$estimate[,var_of_int,drop=FALSE])[,-1]
   rownames(t_) <- rownames(signs_table)
 
   temp_ <- merge(t(signs_table), t_, by=0,all.x=TRUE)
@@ -250,17 +315,28 @@ f_2 <- as.data.frame(forecast(test_2,h=horizon))
 
 f_2a <- f_2 + t(predict(lm_,newdata=newDF_h[1:horizon,keepers,drop=FALSE]))
 
+test_3 <- auto.arima(newDF_t[,var_of_int,drop=FALSE],xreg=lm_$residuals)
+
+f_3_lm_r <- forecast(lm_, newDF_h[1:horizon,keepers,drop=FALSE], h=horizon)
+
+#test_4 <- arfima(newDF_t[,var_of_int,drop=FALSE],xreg=lm_$residuals,estim=c("mle"))
+
+f_3a <- as.data.frame(forecast(test_3,h=horizon,xreg=f_3_lm_r$mean))
+
 rownames(f_1a) <- rownames(actual)
 rownames(f_2a) <- rownames(actual)
+rownames(f_3a) <- rownames(actual)
 
-e_f_2a <- mean(abs(f_2a$`Point Forecast`-t(actual)))
 e_f_1a <- mean(abs(f_1a$`Point Forecast`-t(actual)))
+e_f_2a <- mean(abs(f_2a$`Point Forecast`-t(actual)))
+e_f_3a <- mean(abs(f_3a$`Point Forecast`-t(actual)))
 
 e_f_0 <- mean(abs(f_0$`Point Forecast`-t(actual)))
 
-print(paste("error forecast 1:", e_f_2a))
+print(paste("error forecast 0:", e_f_0))
 
 print(paste("error forecast 1:", e_f_1a))
 
-print(paste("error forecast 0:", e_f_0))
+print(paste("error forecast 2:", e_f_2a))
 
+print(paste("error forecast 3:", e_f_3a))
