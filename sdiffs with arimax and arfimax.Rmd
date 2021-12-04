@@ -1,5 +1,7 @@
-
-packages <- c("dplyr","ggplot2","quantmod","zoo","plyr","forecast","tseries","tidyverse","furrr","lubridate","anytime","caret","ppcor")
+```{r}
+#packages
+{
+packages <- c("dplyr","ggplot2","quantmod","zoo","plyr","forecast","tseries","tidyverse","furrr","lubridate","anytime","caret","ppcor","corrplot")
 
 # Install packages not yet installed
 installed_packages <- packages %in% rownames(installed.packages())
@@ -9,9 +11,16 @@ if (any(installed_packages == FALSE)) {
 
 # Packages loading
 invisible(lapply(packages, library, character.only = TRUE))
+}
+```
 
+```{r}
+#data
 raw <- read.csv("C:/Users/User/Documents/wiki/wiki/dev/python/Python-Stock/data/combined_set.csv",row.names=1,header=TRUE)
+```
 
+```{r}
+#vars
 f = periodicity(as.Date(anytime(rownames(raw))))
 
 critical.r <- function( n, alpha = .05 ) {
@@ -32,8 +41,10 @@ seasonal = switch(
 )  
 
 var_of_int <- "MSPUS"
+```
 
-#starts at 2:
+```{r}
+#differencing
 sndif_ <- c()
 
 for (n in 1:(length(colnames(raw))))
@@ -49,7 +60,6 @@ combo_s <- data.frame(matrix(ncol = 1, nrow = nrow(raw)))
 
 for (d in 1:length(sndif_))
 {#d=1
-  print(d)
   #print(d)
   if(sndif_[d]*seasonal == 0)
   {
@@ -112,7 +122,10 @@ rownames(combo_d) <- rownames(raw)
 
 View(combo_d)
 
-combo_s_m <- data.frame(matrix(ncol = 1, nrow = nrow(raw)))
+#multiplicative (returns) to log
+if(FALSE)
+{
+  combo_s_m <- data.frame(matrix(ncol = 1, nrow = nrow(raw)))
 
 for (d in 1:length(sndif_))
 {#d=1
@@ -155,10 +168,16 @@ rownames(combo_d_m) <- rownames(raw)
 
 View(combo_d_m)
 
+}
+
 #ncol(combo_d)
 
 #View(combo_d)
 
+```
+
+```{r}
+#optimal lagged correlation
 # Example usage: Critical correlation coefficient at sample size of n = 100
 
 names <- c()
@@ -182,7 +201,7 @@ combo_ <- na.omit(dplyr::select(combo_d, -c(drops)))
 for(c in 1:(length(colnames(training))))
 {#c=3
   
-  ccf1 <- ccf(training[,var_of_int,drop=FALSE],training[,c], lag = seasonal, correlation=TRUE, p1=TRUE)
+  ccf1 <- ccf(training[,var_of_int,drop=FALSE],training[,c], lag.max = seasonal, correlation=TRUE, plot=FALSE)
   
   upperCI <- qnorm((1+0.95)/2)/sqrt(ccf1$n.used)
   lowerCI <- -qnorm((1+0.95)/2)/sqrt(ccf1$n.used)
@@ -198,17 +217,17 @@ for(c in 1:(length(colnames(training))))
     {
       names <- c(names,(colnames(training)[c]))
       print(colnames(training)[c])
-      print(max.cor)
       print(lag.opt)
+      print(max.cor)
       lags <- c(lags,lag.opt)
       print(2 * (1 - pnorm(abs(max.cor), mean = 0, sd = 1/sqrt(ccf1$n.used))))
     }
     
   }
 }
-
+```
 #lag example
-cor(na.omit(cbind(training[,var_of_int,],dplyr::lag(training[,"IBM"],1))))
+cor(na.omit(cbind(training[,var_of_int,],dplyr::lag(training[,"SHY"],2))))
 
 newDF <- combo_[,var_of_int,drop=FALSE]
 
@@ -221,7 +240,7 @@ for (n in 1:length(names))
 newDF_t <- na.omit(newDF[1:nrow(training),])
 newDF_h <- na.omit(newDF[(nrow(training)+1):nrow(combo_),])
 
-cor(na.omit(newDF[,1:2,]))
+cor(na.omit(newDF[,c("MSPUS","M1"),]))
 
 sig_table = matrix(0, ncol=ncol(newDF_t))
 colnames(sig_table) <- colnames(newDF_t)
@@ -236,9 +255,9 @@ iteration=0
 dat <- 1:10
 n=length(dat)
 
-lapply(folds,length)
-
 folds<-createTimeSlices(y=rownames(newDF_t),initialWindow = 20,horizon = 10)
+
+#lapply(folds,length)
 
 exclude <- c()
 
@@ -250,9 +269,35 @@ subset = newDF_t[,c(colnames(newDF_t) %notin% c(exclude))]
 
 set_ = subset[,c(colnames(newDF_t) %notin% c(var_of_int))]
 
+PCOR <- function(x, type = c("raw", "cor")) {		 
+		  type <- match.arg(type)
+		  if (type == "raw") {		
+			x <- scale(x)
+			R <- (t(x) %*% x) / (nrow(x) - 1)
+		  } else  {
+			R <- x
+		  }
+		  
+		  ind <- unique(dim(R))
+		  R_inv <- ginv(R)
+		  ZM <- matrix(rep(0, len = (ind*ind)), nrow = ind)
+		  diag(ZM) <- diag(R_inv)
+		  D <- ginv(ZM)
+		  AICOV <- D %*% R_inv %*% D
+		  diag(ZM) <- diag(AICOV)
+		  D  <- ginv(sqrt(ZM))
+		  AICOR <- D %*% AICOV %*% D
+		  pcor <- AICOR
+		  pcor[upper.tri(pcor)] <- -pcor[upper.tri(pcor)]
+		  pcor[lower.tri(pcor)] <- -pcor[lower.tri(pcor)]
+		  dimnames(pcor) <- list(colnames(R), colnames(R))
+		  return(pcor)
+		}  
+
 while(max_pvalue>=p_threshold)
 {
-  p_values  <- pcor(subset, method = c("spearman"))$p.value[,var_of_int,drop=FALSE]
+  p_values  <- (2 * (1 - pnorm(abs(PCOR(subset)[,var_of_int,drop=FALSE]), mean = 0, sd = 1/sqrt(nrow(subset)))))
+  #pcor(subset, method = c("spearman"))$p.value[,var_of_int,drop=FALSE]
   
   max_pname = rownames(p_values)[which.max(p_values)]
   max_pvalue = p_values[max_pname,]
@@ -279,7 +324,7 @@ signs_table_ = ifelse(signs_table_==0,0,ifelse(signs_table_<0,-1,1))
 signs_table = signs_table_ + signs_table
 
 
-keepers = colnames(sig_table)[sig_table>=(length(folds$train)/2)]
+keepers = winners #colnames(sig_table)[sig_table>=(length(folds$train)/2)]
 
 horizon = 5
 
@@ -293,10 +338,12 @@ checkresiduals(lm_$residuals)
 
 actual <- newDF_h[1:horizon,var_of_int,drop=FALSE]
 
+#straight arima of y
 test_0 <- auto.arima(newDF_t[,var_of_int,drop=FALSE])
 
 f_0 <- as.data.frame(forecast(test_0,h=horizon))
 
+#arima of lm residuals
 test_1 <- auto.arima(lm_$residuals)
 
 f_1 <- as.data.frame(forecast(test_1,h=horizon))
@@ -305,12 +352,14 @@ f_1a <- f_1 + t(predict(lm_,newdata=newDF_h[1:horizon,keepers,drop=FALSE]))
 
 rownames(f_1a) <- rownames(actual)
 
+#arfima of residuals
 test_2 <- arfima(lm_$residuals)
 
 f_2 <- as.data.frame(forecast(test_2,h=horizon))
 
 f_2a <- f_2 + t(predict(lm_,newdata=newDF_h[1:horizon,keepers,drop=FALSE]))
 
+#arima exogenous
 test_3 <- auto.arima(newDF_t[,var_of_int,drop=FALSE],xreg=lm_$residuals)
 
 f_3_lm_r <- forecast(lm_, newDF_h[1:horizon,keepers,drop=FALSE], h=horizon)
