@@ -164,7 +164,6 @@ View(combo_d_m)
 names <- c()
 lags <- c()
 
-
 numZero <- colSums(combo_d == 0, na.rm = T)
 
 limit = (nrow(raw)/2)
@@ -229,7 +228,7 @@ colnames(sig_table) <- colnames(newDF_t)
 signs_table = matrix(0, ncol=ncol(newDF_t))
 colnames(signs_table) <- colnames(newDF_t)
 
-p_threshold = .33
+p_threshold = .05
 
 New_Names = colnames(newDF_t)[2:length(colnames(newDF_t))]
 iteration=0
@@ -245,43 +244,40 @@ exclude <- c()
 
 #crit <- critical.r(nrow(set_), .05)
 
-for (k in 1:length(folds$train))
-{#k=1
-  max_pvalue = 1
-  
-  subset = newDF_t[(folds$train[k][[1]]),c(colnames(newDF_t) %notin% c(exclude))]
-  
-  set_ = subset[,c(colnames(newDF_t) %notin% c(var_of_int))]
-  
-  while(max_pvalue>=p_threshold)
-  {
-    p_values  <- pcor(subset, method = c("spearman"))$p.value[,var_of_int,drop=FALSE]
-    
-    max_pname = rownames(p_values)[which.max(p_values)]
-    max_pvalue = p_values[max_pname,]
-    
-    if (max_pvalue >= p_threshold)
-    {
-      print(max_pvalue)
-      print(max_pname)
-      subset <- dplyr::select(subset,-c(max_pname))
-      
-    }
-  }
-    
-  winners = rownames(p_values)[rownames(p_values) %notin% c(var_of_int)]
-  sig_table = sig_table + as.integer(colnames(newDF_t) %in% winners)
-  
-  t_ <- t(pcor(subset[,c(var_of_int,winners)], method = c("spearman"))$estimate[,var_of_int,drop=FALSE])[,-1]
-  rownames(t_) <- rownames(signs_table)
+max_pvalue = 1
 
-  temp_ <- merge(t(signs_table), t_, by=0,all.x=TRUE)
-  rownames(temp_) <- temp_$Row.names
-  signs_table_ = rowSums(temp_[,2:3],na.rm=TRUE)
-  signs_table_ = ifelse(signs_table_==0,0,ifelse(signs_table_<0,-1,1))
-  signs_table = signs_table_ + signs_table
+subset = newDF_t[,c(colnames(newDF_t) %notin% c(exclude))]
+
+set_ = subset[,c(colnames(newDF_t) %notin% c(var_of_int))]
+
+while(max_pvalue>=p_threshold)
+{
+  p_values  <- pcor(subset, method = c("spearman"))$p.value[,var_of_int,drop=FALSE]
   
+  max_pname = rownames(p_values)[which.max(p_values)]
+  max_pvalue = p_values[max_pname,]
+  
+  if (max_pvalue >= p_threshold)
+  {
+    print(max_pvalue)
+    print(max_pname)
+    subset <- dplyr::select(subset,-c(max_pname))
+    
+  }
 }
+  
+winners = rownames(p_values)[rownames(p_values) %notin% c(var_of_int)]
+sig_table = sig_table + as.integer(colnames(newDF_t) %in% winners)
+
+t_ <- t(pcor(subset[,c(var_of_int,winners)], method = c("spearman"))$estimate[,var_of_int,drop=FALSE])[,-1]
+rownames(t_) <- rownames(signs_table)
+
+temp_ <- merge(t(signs_table), t_, by=0,all.x=TRUE)
+rownames(temp_) <- temp_$Row.names
+signs_table_ = rowSums(temp_[,2:3],na.rm=TRUE)
+signs_table_ = ifelse(signs_table_==0,0,ifelse(signs_table_<0,-1,1))
+signs_table = signs_table_ + signs_table
+
 
 keepers = colnames(sig_table)[sig_table>=(length(folds$train)/2)]
 
