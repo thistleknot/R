@@ -1,7 +1,7 @@
 ```{r}
 #packages
 {
-packages <- c("dplyr","ggplot2","quantmod","zoo","plyr","forecast","tseries","tidyverse","furrr","lubridate","anytime","car","caret","ppcor","whitening","TSA","corrplot")
+packages <- c("dplyr","ggplot2","quantmod","zoo","plyr","forecast","tseries","tidyverse","furrr","reshape","lubridate","anytime","car","caret","ppcor","whitening","TSA","corrplot")
 
 # Install packages not yet installed
 installed_packages <- packages %in% rownames(installed.packages())
@@ -63,7 +63,7 @@ f = periodicity(as.Date(anytime(rownames(raw))))
 
 options("scipen"=100, "digits"=4)
 
-seasonal = switch(  
+season = switch(  
   f$scale,  
   "monthly"= 12,  
   "daily"= 252,  
@@ -72,104 +72,57 @@ seasonal = switch(
 )  
 
 #plot(raw$GDPC1)
-#var_of_int <- "MSPUS"
-var_of_int <- "GDPC1"
+var_of_int <- "MSPUS"
+#var_of_int <- "GDPC1"
 
 ```
 
 ```{r}
 #differencing
-sndif_ <- c()
 
-for (n in 1:(length(colnames(raw))))
-{
-  #print(n)
-  d_ <- nsdiffs(ts(raw[,n],frequency=seasonal))
-  
-  #print(d_)
-  sndif_ <- c(sndif_,d_)
-}
-
-combo_s <- data.frame(matrix(ncol = 1, nrow = nrow(raw)))
-
-for (d in 1:length(sndif_))
-{#d=1
-  #print(d)
-  if(sndif_[d]*seasonal == 0)
+sndif_ <- unlist(lapply(1:(length(colnames(raw))),function(n)
   {
-    combo_s <- cbind(combo_s,raw[,d,drop=FALSE])
-  }else
+    d_ <- nsdiffs(ts(raw[,n],frequency=season))
+    return(d_)
+  }))
+
+combo_s <- do.call(cbind,lapply(1:length(sndif_), function(d)
   {
-    temp <- raw[,d,drop=FALSE]
-    for(dif in 1:sndif_[d])
+    if(sndif_[d]*season == 0)
     {
-      temp <- temp-dplyr::lag(temp,1*seasonal)
+      temp <- raw[,d,drop=FALSE]
+    }else
+    {
+      temp <- raw[,d,drop=FALSE]
+      for(dif in 1:sndif_[d])
+      {
+        temp <- temp-dplyr::lag(temp,1*season)
+      }
     }
-    combo_s <- cbind(combo_s,temp)
-  }
-  
-}
-
-combo_s = subset(combo_s, select = -c(1) )
-
-rownames(combo_s) <- rownames(raw)
-
-#ncol(combo_s)
-#ncol(raw)
-
-#View(combo_s)
+  return(temp)
+  }))
 
 ndif_ <- c()
 
-for (n in 1:(length(colnames(combo_s))))
+ndif_ <- unlist(lapply(1:(length(colnames(combo_s))),function(n)
 {
-  #print(n)
   d_ <- ndiffs(combo_s[,n])
-  #min 1 to ensure I'm being consisten (i.e. measuring rate of change between quarters)
-  if(d_ == 0)
-  {
-    d_ = 1
-    }
-  
-  ndif_ <- c(ndif_,d_)
-}
+  #min 1 to ensure I'm being consistent (i.e. measuring rate of change between quarters). Note: ndiffs == na's return 0 so I handle na's in combo_d
+  if(d_ == 0){d_ = 1}
+  return(d_)
+}))
 
-combo_d <- data.frame(matrix(ncol = 1, nrow = nrow(raw)))
-
-for (d in 1:length(ndif_))
-{#d=1
-  #print(ndif_[d])
-  '
-  if(ndif_[d] == 0)
-  {
-    #print("TRUE")
-    #combo_d <- cbind(combo_d,combo_s[,d,drop=FALSE])
-    
-    temp <- combo_s[,d,drop=FALSE]
-    temp <- as.data.frame(unlist(lapply((temp-dplyr::lag(temp,1)),function(x){ifelse(is.nan(x),return(0),return(x))})))
-    colnames(temp) <- colnames(combo_s[,d,drop=FALSE])
-    rownames(temp) <- rownames(combo_s[,d,drop=FALSE])
-    combo_d <- cbind(combo_d,temp)
-  }else
-  '
-  {
-    temp <- combo_s[,d,drop=FALSE]
+combo_d <- do.call(cbind,lapply(1:length(ndif_),function(d)
+{#no if check for 0 because at a minimum I want one difference
+  temp <- combo_s[,d,drop=FALSE]
     for(dif in 1:ndif_[d])
     {
       temp <- as.data.frame(unlist(lapply((temp-dplyr::lag(temp,1)),function(x){ifelse(is.nan(x),return(0),return(x))})))
       colnames(temp) <- colnames(combo_s[,d,drop=FALSE])
       rownames(temp) <- rownames(combo_s[,d,drop=FALSE])
-      
     }
-    combo_d <- cbind(combo_d,temp)
-  }
-}
-
-combo_d = subset(combo_d, select = -c(1) )
-
-rownames(combo_d) <- rownames(raw)
-
-View(combo_d)
+    return(temp)
+}))
 
 #multiplicative (returns) to log
 
@@ -177,93 +130,38 @@ if(FALSE)
 #CFNAIDIFF has negative initial values which make calculating returns impossible
 {
 
-  combo_s_m <- data.frame(matrix(ncol = 1, nrow = nrow(raw)))
-  
-  for (d in 1:length(sndif_))
-  {#d=28
-    #print(sndif_[d])
-    if(sndif_[d]*seasonal == 0)
+  combo_s_m <- do.call(cbind,lapply(1:length(sndif_),function(d)
     {
-      combo_s_m <- cbind(combo_s_m,raw[,d,drop=FALSE])
-    }else
-    {
-      temp <- raw[,d,drop=FALSE]
-      for (sdif in 1:sndif_[d])
+      if(sndif_[d]*season == 0)
       {
-        #print(sdif)
-        #View(temp)
-        temp <- (1+((temp-dplyr::lag(temp,1*seasonal))/dplyr::lag(temp,1*seasonal)))
+        temp <- raw[,d,drop=FALSE]
+      }else
+      {
+        temp <- raw[,d,drop=FALSE]
+        for (sdif in 1:sndif_[d])
+        {
+
+          temp <- (1+((temp-dplyr::lag(temp,1*season))/dplyr::lag(temp,1*season)))
+        }
       }
-      combo_s_m <- cbind(combo_s_m,temp)    
-    }
-    
-  }
+    return(temp)
+    }))
   
-  
-  combo_s_m = subset(combo_s_m, select = -c(1) )
-  #View(raw[,"GVZCLS",drop=FALSE])
-  #View(combo_s_m)
-  
-  #hist(combo_s_m$MABMM301USM189S)
-  
-  rownames(combo_s_m) <- rownames(raw)
-  
-  #View(combo_s_m)
-  
-  combo_d_m <- data.frame(matrix(ncol = 1, nrow = nrow(raw)))
-  
-  for (d in 1:length(ndif_))
-  {#d=53
-    #print(ndif_[d])
-    '
-    if(ndif_[d] == 0)
-    {
-      #print("TRUE")
-      #combo_d_m <- cbind(combo_d_m,combo_s_m[,d,drop=FALSE])
-      temp <- combo_s_m[,d,drop=FALSE]
-      temp <- as.data.frame(unlist(1+lapply((temp-dplyr::lag(temp,1)),function(x){ifelse(is.nan(x),return(0),return(x))})))
-      colnames(temp) <- colnames(combo_s_m[,d,drop=FALSE])
-      rownames(temp) <- rownames(combo_s_m[,d,drop=FALSE])
-      combo_d_m <- cbind(combo_d_m,temp)
-    }else
-    '
-    {
+  combo_d_m <- do.call(cbind,lapply(1:length(ndif_),function(d)
+  {
+    #d=1
       temp <- combo_s_m[,d,drop=FALSE]
       for (dif in 1:ndif_[d])
       {
-        temp <- as.data.frame(unlist(1+lapply((temp-dplyr::lag(temp,1)),function(x){ifelse(is.nan(x),return(0),return(x))})))
-          #(1+((temp-dplyr::lag(temp,1))/dplyr::lag(temp,1)))
+        temp <- (1+((temp-dplyr::lag(temp,1))/dplyr::lag(temp,1)))
+        
+        temp <- as.data.frame(lapply(temp,function(x){ifelse(is.nan(x),return(0),return(x))}))
+        rownames(temp) <- rownames(combo_s_m[,d,drop=FALSE])
       }
-      
-      combo_d_m <- cbind(combo_d_m,temp)
-      
-    }
-    
-  }
-
-combo_d_m = subset(combo_d_m, select = -c(1) )
-
-rownames(combo_d_m) <- rownames(raw)
-
-
+      return(temp)
+  }))
 
 }
-
-'
-ndif_[match("CFNAIDIFF",colnames(combo_s_m))]
-sndif_[match("CFNAIDIFF",colnames(combo_s_m))]
-
-hist(combo_d_m$CFNAIDIFF)
-
-colnames(combo_d_m[,(ndif_ + sndif_)>0])
-
-combo_d_m[,(ndif_ + sndif_)>0] <- log10(combo_d_m[,(ndif_ + sndif_)>0])
-'
-#View(combo_d_m)
-
-#ncol(combo_d)
-
-#View(combo_d)
 
 ```
 
@@ -300,7 +198,7 @@ combo_ <- na.omit(combo_d)
 for(c in 1:(length(colnames(training))))
 {#c=3
   
-  ccf1 <- ccf(training[,var_of_int,drop=FALSE],training[,c], lag.max = seasonal, correlation=TRUE, plot=FALSE)
+  ccf1 <- ccf(training[,var_of_int,drop=FALSE],training[,c], lag.max = season, correlation=TRUE, plot=FALSE)
   
   upperCI <- qnorm((1+0.95)/2)/sqrt(ccf1$n.used)
   lowerCI <- -qnorm((1+0.95)/2)/sqrt(ccf1$n.used)
@@ -409,7 +307,7 @@ sig_table = sig_table + as.integer(colnames(newDF_t) %in% winners)
 
 #t_ <- t(pcor(subset[,c(var_of_int,winners)], method = c("spearman"))$estimate[,var_of_int,drop=FALSE])[,-1]
 
-corrplot(PCOR(subset[,c(var_of_int,winners)]))
+corrplot(cor(subset_w[,c(var_of_int,winners)]))
 '
 rownames(t_) <- rownames(signs_table)
 
@@ -424,21 +322,21 @@ keepers = winners #colnames(sig_table)[sig_table>=(length(folds$train)/2)]
 
 as.data.frame(rbind(sndif_[which(match(colnames(raw),c(var_of_int,winners))>0)],ndif_[which(match(colnames(raw),c(var_of_int,winners))>0)]))
 
-differences <- as.data.frame(rbind(c(0,lags[which(match(names,c(var_of_int,winners))>0)]),sndif_[which(match(colnames(raw),c(var_of_int,winners))>0)],ndif_[which(match(colnames(raw),c(var_of_int,winners))>0)]))
+#min of 1
+differences <- as.data.frame(rbind(c(1,lags[which(match(names,c(var_of_int,winners))>0)]),sndif_[which(match(colnames(raw),c(var_of_int,winners))>0)],ndif_[which(match(colnames(raw),c(var_of_int,winners))>0)]))
 
 #cbind(names[which(match(names,c(var_of_int,winners))>0)],
 
 #lags[which(match(colnames(raw),c(var_of_int,winners))>0)]
 colnames(differences) <- c(var_of_int,winners)
 
-rownames(differences) <- c("lags","seasonal","nonseasonal")
+rownames(differences) <- c("lags","season","nonseason")
 print(differences)
 
 for(h in c(var_of_int,winners))
 {
   hist(subset[,h])
 }
-
 
 lm_raw <- lm(na.omit(newDF_t[,c(var_of_int,winners),drop=FALSE]))
 summary(lm_raw)
@@ -495,6 +393,8 @@ f_3_lm_r <- forecast(lm_, newDF_h[1:horizon,winners,drop=FALSE], h=horizon)
 
 f_3a <- as.data.frame(forecast(test_3,h=horizon,xreg=f_3_lm_r$mean))
 
+rownames(f_3a)
+
 rownames(f_1a) <- rownames(actual)
 rownames(f_2a) <- rownames(actual)
 rownames(f_3a) <- rownames(actual)
@@ -513,7 +413,25 @@ print(paste("error forecast 2:", e_f_2a))
 
 print(paste("error forecast 3:", e_f_3a))
 
+test_ <- forecast(test_3,h=horizon,xreg=f_3_lm_r$mean)
 
-#hist(raw$CFNAIDIFF)
+differences
+
+mean_ <- raw[rownames(newDF_t[nrow(newDF_t),var_of_int,drop=FALSE]),var_of_int]+cumsum(f_3a)[,1]
+lower_ <- raw[rownames(newDF_t[nrow(newDF_t),var_of_int,drop=FALSE]),var_of_int]+cumsum(f_3a)[,4]
+upper_ <- raw[rownames(newDF_t[nrow(newDF_t),var_of_int,drop=FALSE]),var_of_int]+cumsum(f_3a)[,5]
+actual_ <- raw[rownames(actual),var_of_int,drop=FALSE]
+
+df <- data.frame(time = anydate(rownames(newDF_t)[1:length(mean_)]), actual_, mean_,lower_,upper_)
+
+df <- melt(df ,  id.vars = 'time', variable.name = 'series')
+
+ggplot(df, aes(time,value)) + geom_line(aes(colour = series))
+
+```
+
+
+```{r}
+
 
 ```
