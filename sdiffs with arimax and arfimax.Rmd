@@ -124,6 +124,37 @@ combo_d <- do.call(cbind,lapply(1:length(ndif_),function(d)
     return(temp)
 }))
 
+#do cumsum to find out the reconstructed value at any given position
+reconstruct <- do.call(cbind,lapply(1:length(ndif_),function(d)
+{#d=8
+  
+  temp <- raw[,d,drop=FALSE]
+  
+  set <- temp
+  
+  for (d_ in 1:ndif_[d])
+  {#d_=1
+    
+    temp <- as.data.frame(unlist(lapply((temp-dplyr::lag(temp,1)),function(x){ifelse(is.nan(x),return(0),return(x))})))
+    colnames(temp) <- d_
+    set <- cbind(set, temp)
+    
+  }
+  
+  rownames(set) <- rownames(combo_d)
+  
+  reconstructed <- as.data.frame(c(unlist(lapply(rbind(1:(ncol(set)-1)),function(r_)
+  {#r_=3
+    (set[r_,r_])
+  })),set[(ndif_[d]+1):nrow(set),ncol(set)]))
+  
+  colnames(reconstructed)<-colnames(raw[,d,drop=FALSE])
+  rownames(reconstructed) <- rownames(combo_d)
+  
+  return(reconstructed)
+  
+}))
+
 #multiplicative (returns) to log
 
 if(FALSE)
@@ -194,7 +225,7 @@ combo_ <- na.omit(combo_d)
   #validation <- training-round(nrow(combo_)*.7*.3,0)
   holdout <- combo_[(nrow(training)+1):nrow(combo_),]
 }
-
+  
 for(c in 1:(length(colnames(training))))
 {#c=3
   
@@ -393,7 +424,9 @@ f_3_lm_r <- forecast(lm_, newDF_h[1:horizon,winners,drop=FALSE], h=horizon)
 
 f_3a <- as.data.frame(forecast(test_3,h=horizon,xreg=f_3_lm_r$mean))
 
-rownames(f_3a)
+#lapply(c(2,3,4),function(x){f_3_lm_r[names(f_3_lm_r)[x]]})
+
+#rownames(f_3a)
 
 rownames(f_1a) <- rownames(actual)
 rownames(f_2a) <- rownames(actual)
