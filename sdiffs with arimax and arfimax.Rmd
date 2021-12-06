@@ -126,7 +126,6 @@ nv_diff_sets <- function(s,d,y,season=4,nv=NA)
     
   }
   
-  
   return(extended)
   
 }
@@ -314,7 +313,7 @@ for(c in 1:(length(colnames(training))))
 
 ```
 ```{r}
-#filter
+#ZCA backstep filter
 
 newDF <- combo_[,var_of_int,drop=FALSE]
 
@@ -440,7 +439,7 @@ na.omit(newDF_t[,c(var_of_int,winners),drop=FALSE])
 ```
 
 ```{r}
-#models
+#model construction and holdout analysis
 
 horizon = 5
 
