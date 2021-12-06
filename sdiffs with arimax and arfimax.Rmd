@@ -308,10 +308,18 @@ for(c in 1:(length(colnames(training))))
   }
 }
 
+#needed if lag.opt>=0
+if(min(lags)==0)
+{
+  names <- names[names %notin% var_of_int]
+}
+
+
 #lag example
 #cor(na.omit(cbind(training[,var_of_int,],dplyr::lag(training[,"SHY"],2))))
 
 ```
+
 ```{r}
 #ZCA backstep filter
 
@@ -335,7 +343,7 @@ colnames(signs_table) <- colnames(newDF_t)
 
 p_threshold = .05
 
-New_Names = colnames(newDF_t)[2:length(colnames(newDF_t))]
+#New_Names = colnames(newDF_t)[2:length(colnames(newDF_t))]
 iteration=0
 
 dat <- 1:10
@@ -353,6 +361,12 @@ max_pvalue = 1
 
 subset = newDF_t[,c(colnames(newDF_t) %notin% c(exclude))]
 
+#View(subset[,c(colnames(newDF_t) %notin% c(var_of_int))])
+
+#whitening::whiten(subset[,c(colnames(newDF_t) %notin% c(var_of_int))])
+
+#whitening::whiteningMatrix(as.matrix(subset[,c(colnames(newDF_t) %notin% c(var_of_int))]), method=c("ZCA"))
+
 subset_w <- cbind(subset[,var_of_int,drop=FALSE],as.data.frame(whiten(as.matrix(subset[,c(colnames(newDF_t) %notin% c(var_of_int))]), method=c("ZCA"))))
 
 colnames(subset_w) <- colnames(subset)
@@ -360,12 +374,15 @@ rownames(subset_w) <- rownames(subset)
 
 corrplot(cor(subset_w))
 
-set_ = subset_w[,c(colnames(newDF_t) %notin% c(var_of_int))]
+#set_ = subset_w[,c(colnames(newDF_t) %notin% c(var_of_int))]
+#set_ = subset[,c(colnames(newDF_t) %notin% c(var_of_int))]
 
 while(max_pvalue>=p_threshold)
 {
-  p_values  <- (2 * (1 - pnorm(abs(cor(subset_w)[,var_of_int,drop=FALSE]), mean = 0, sd = 1/sqrt(nrow(subset)))))
+  p_values  <- (2 * (1 - pnorm(abs(cor(subset_w)[,var_of_int,drop=FALSE]), mean = 0, sd = 1/sqrt(nrow(subset_w)))))
   #p_values  <- (2 * (1 - pnorm(abs(PCOR(subset)[,var_of_int,drop=FALSE]), mean = 0, sd = 1/sqrt(nrow(subset)))))
+  
+  #print(grep(var_of_int,rownames(p_values)))
   
   #pcor(subset, method = c("spearman"))$p.value[,var_of_int,drop=FALSE]
   
@@ -377,17 +394,20 @@ while(max_pvalue>=p_threshold)
     print(max_pvalue)
     print(max_pname)
     temp <- dplyr::select(subset_w,-c(max_pname))
-    if(ncol(temp)==2)
+    #temp <- dplyr::select(subset,-c(max_pname))
+    if(ncol(temp)==1)
     {
       break
     }
     else
     {
       temp_ <- cbind(subset_w[,var_of_int,drop=FALSE],as.data.frame(whiten(as.matrix(temp[,c(colnames(temp) %notin% c(var_of_int))]), method=c("ZCA"))))
+      #temp_ <- cbind(subset[,var_of_int,drop=FALSE],temp[,c(colnames(temp) %notin% c(var_of_int))])
       
   colnames(temp_) <- colnames(temp)
   rownames(temp_) <- rownames(temp)
   subset_w <- temp_
+  #subset <- temp_
     }
   }
 }
@@ -397,7 +417,12 @@ sig_table = sig_table + as.integer(colnames(newDF_t) %in% winners)
 
 #t_ <- t(pcor(subset[,c(var_of_int,winners)], method = c("spearman"))$estimate[,var_of_int,drop=FALSE])[,-1]
 
-corrplot(cor(subset_w[,c(var_of_int,winners)]))
+#corrplot(cor(subset_w[,c(var_of_int,winners)]))
+
+#corrplot(PCOR(subset[,c(var_of_int,winners),drop=FALSE]))
+corrplot(PCOR(subset_w[,c(var_of_int,winners)]))
+
+#View(subset[,c(var_of_int,winners)])
 '
 rownames(t_) <- rownames(signs_table)
 
@@ -410,7 +435,7 @@ signs_table = signs_table_ + signs_table
 keepers = winners #colnames(sig_table)[sig_table>=(length(folds$train)/2)]
 '
 
-as.data.frame(rbind(sndif_[which(match(colnames(raw),c(var_of_int,winners))>0)],ndif_[which(match(colnames(raw),c(var_of_int,winners))>0)]))
+#as.data.frame(rbind(sndif_[which(match(colnames(raw),c(var_of_int,winners))>0)],ndif_[which(match(colnames(raw),c(var_of_int,winners))>0)]))
 
 #min of 1
 differences <- as.data.frame(rbind(c(0,lags[which(match(names,c(var_of_int,winners))>0)]),sndif_[which(match(colnames(raw),c(var_of_int,winners))>0)],ndif_[which(match(colnames(raw),c(var_of_int,winners))>0)]))
