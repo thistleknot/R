@@ -414,7 +414,7 @@ keepers = winners #colnames(sig_table)[sig_table>=(length(folds$train)/2)]
 as.data.frame(rbind(sndif_[which(match(colnames(raw),c(var_of_int,winners))>0)],ndif_[which(match(colnames(raw),c(var_of_int,winners))>0)]))
 
 #min of 1
-differences <- as.data.frame(rbind(c(1,lags[which(match(names,c(var_of_int,winners))>0)]),sndif_[which(match(colnames(raw),c(var_of_int,winners))>0)],ndif_[which(match(colnames(raw),c(var_of_int,winners))>0)]))
+differences <- as.data.frame(rbind(c(0,lags[which(match(names,c(var_of_int,winners))>0)]),sndif_[which(match(colnames(raw),c(var_of_int,winners))>0)],ndif_[which(match(colnames(raw),c(var_of_int,winners))>0)]))
 
 #cbind(names[which(match(names,c(var_of_int,winners))>0)],
 
@@ -492,11 +492,10 @@ rownames(f_1a) <- rownames(actual)
 rownames(f_2a) <- rownames(actual)
 rownames(f_3a) <- rownames(actual)
 
+e_f_0 <- mean(abs(f_0$`Point Forecast`-t(actual)))
 e_f_1a <- mean(abs(f_1a$`Point Forecast`-t(actual)))
 e_f_2a <- mean(abs(f_2a$`Point Forecast`-t(actual)))
 e_f_3a <- mean(abs(f_3a$`Point Forecast`-t(actual)))
-
-e_f_0 <- mean(abs(f_0$`Point Forecast`-t(actual)))
 
 print(paste("error forecast 0:", e_f_0))
 
@@ -505,10 +504,6 @@ print(paste("error forecast 1:", e_f_1a))
 print(paste("error forecast 2:", e_f_2a))
 
 print(paste("error forecast 3:", e_f_3a))
-
-test_ <- forecast(test_3,h=horizon,xreg=f_3_lm_r$mean)
-
-differences
 
 mean_ <- nv_diff_sets(sndif_[which(colnames(raw)==var_of_int)],ndif_[which(colnames(raw)==var_of_int)],raw[rownames(newDF_t),var_of_int,drop=FALSE],season,c(f_3a$`Point Forecast`))
 lower_ <- nv_diff_sets(sndif_[which(colnames(raw)==var_of_int)],ndif_[which(colnames(raw)==var_of_int)],raw[rownames(newDF_t),var_of_int,drop=FALSE],season,c(f_3a$'Lo 95'))
@@ -520,11 +515,54 @@ df <- data.frame(time = anydate(rownames(newDF_t)[1:length(mean_)]), actual_, me
 
 df <- melt(df ,  id.vars = 'time', variable.name = 'series')
 
-ggplot(df, aes(time,value)) + geom_line(aes(colour = series))
+ggplot(df, aes(time,value)) + geom_line(aes(colour = variable))
+```
 
 
+```{r}
+#actual forecast
+
+fore_data <- na.omit(newDF[,c(var_of_int,winners)])
+
+lm_a <- lm(f, data=fore_data)
+
+#length(lm_a$residuals)
+#View(lm_a$residuals)
+#nrow(na.omit(newDF[,c(var_of_int,winners)]))
+
+#plot(lm_a$residuals)
+
+forecast_a <- auto.arima(fore_data[,var_of_int,drop=FALSE],xreg=lm_a$residuals)
+newDF[,c(var_of_int,winners)]
+
+#h=max(differences[1,2:length(colnames(differences))
+f_3_lm_r_a <- forecast(lm_a, fore_data, h=horizon)
+
+#test_4 <- arfima(newDF_t[,var_of_int,drop=FALSE],xreg=lm_$residuals,estim=c("mle"))
+
+f_3a_a <- as.data.frame(forecast(forecast_a,h=horizon,xreg=f_3_lm_r_a$mean))
 
 
+mean_ <- nv_diff_sets(sndif_[which(colnames(raw)==var_of_int)],ndif_[which(colnames(raw)==var_of_int)],raw[rownames(newDF),var_of_int,drop=FALSE],season,c(f_3a$`Point Forecast`))
+lower_ <- nv_diff_sets(sndif_[which(colnames(raw)==var_of_int)],ndif_[which(colnames(raw)==var_of_int)],raw[rownames(newDF),var_of_int,drop=FALSE],season,c(f_3a$'Lo 95'))
+upper_ <- nv_diff_sets(sndif_[which(colnames(raw)==var_of_int)],ndif_[which(colnames(raw)==var_of_int)],raw[rownames(newDF),var_of_int,drop=FALSE],season,c(f_3a$'Hi 95'))
+
+#actual_f <- raw[rownames(actual),var_of_int,drop=FALSE]
+
+newDates <- c(anydate(rownames(newDF))[length(rownames(newDF))]+days(92),
+anydate(rownames(newDF))[length(rownames(newDF))]+days(91*2),
+anydate(rownames(newDF))[length(rownames(newDF))]+days(91*3),
+anydate(rownames(newDF))[length(rownames(newDF))]+days(91.25*4),
+anydate(rownames(newDF))[length(rownames(newDF))]+days(91.4*5)
+)
+
+#lubridate::ceiling_date(Sys.Date(), unit = "month")
+        
+df_a <- data.frame(time = newDates, mean_,lower_,upper_)
+
+df_a <- melt(df_a ,  id.vars = 'time', variable.name = 'series')
+
+ggplot(df_a, aes(time,value)) + geom_line(aes(colour = variable))
 
 
 ```
