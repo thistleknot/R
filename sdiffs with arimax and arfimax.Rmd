@@ -130,7 +130,21 @@ nv_diff_sets <- function(s,d,y,season=4,nv=NA)
   
 }
 
-
+'
+ZCA_svd <- function(x)
+{
+  #x=subset[,2:length(colnames(subset))]
+  x_c = x - colMeans(x)
+  sigma = cov(x)
+  l = svd(x)
+  View(l)
+  u = l$v #$vectors
+  l_ = l$d
+  x_rot = as.matrix(x_c)%*%u
+  x_white = x_rot / sqrt(l_)
+  return(x_white)
+}
+'
 ```
 
 ```{r}
@@ -363,16 +377,18 @@ subset = newDF_t[,c(colnames(newDF_t) %notin% c(exclude))]
 
 #View(subset[,c(colnames(newDF_t) %notin% c(var_of_int))])
 
-#whitening::whiten(subset[,c(colnames(newDF_t) %notin% c(var_of_int))])
+#doesn't like 36+
+#whitening::whiten(as.matrix(subset[,c(colnames(newDF_t) %notin% c(var_of_int))]),center=TRUE,method=c("ZCA"))
 
-#whitening::whiteningMatrix(as.matrix(subset[,c(colnames(newDF_t) %notin% c(var_of_int))]), method=c("ZCA"))
+#whitening::whiteningMatrix(as.matrix(cov(subset[,c(colnames(newDF_t) %notin% c(var_of_int))])), method=c("ZCA"))
+
+#View(sort((t(summary(subset))[,4])))
 
 subset_w <- cbind(subset[,var_of_int,drop=FALSE],as.data.frame(whiten(as.matrix(subset[,c(colnames(newDF_t) %notin% c(var_of_int))]), method=c("ZCA"))))
-
 colnames(subset_w) <- colnames(subset)
 rownames(subset_w) <- rownames(subset)
 
-corrplot(cor(subset_w))
+#corrplot(cor(subset_w))
 
 #set_ = subset_w[,c(colnames(newDF_t) %notin% c(var_of_int))]
 #set_ = subset[,c(colnames(newDF_t) %notin% c(var_of_int))]
