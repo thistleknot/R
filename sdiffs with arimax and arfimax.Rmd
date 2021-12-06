@@ -149,8 +149,8 @@ season = switch(
 )  
 
 #plot(raw$GDPC1)
-var_of_int <- "MSPUS"
-#var_of_int <- "GDPC1"
+#var_of_int <- "MSPUS"
+var_of_int <- "GDPC1"
 
 ```
 
@@ -378,13 +378,18 @@ while(max_pvalue>=p_threshold)
     print(max_pvalue)
     print(max_pname)
     temp <- dplyr::select(subset_w,-c(max_pname))
-    temp_ <- cbind(subset_w[,var_of_int,drop=FALSE],as.data.frame(whiten(as.matrix(temp[,c(colnames(temp) %notin% c(var_of_int))]), method=c("ZCA"))))
+    if(ncol(temp)==2)
+    {
+      break
+    }
+    else
+    {
+      temp_ <- cbind(subset_w[,var_of_int,drop=FALSE],as.data.frame(whiten(as.matrix(temp[,c(colnames(temp) %notin% c(var_of_int))]), method=c("ZCA"))))
       
   colnames(temp_) <- colnames(temp)
   rownames(temp_) <- rownames(temp)
   subset_w <- temp_
-
-    
+    }
   }
 }
   
@@ -505,9 +510,10 @@ test_ <- forecast(test_3,h=horizon,xreg=f_3_lm_r$mean)
 
 differences
 
-mean_ <- raw[rownames(newDF_t[nrow(newDF_t),var_of_int,drop=FALSE]),var_of_int]+cumsum(f_3a)[,1]
-lower_ <- raw[rownames(newDF_t[nrow(newDF_t),var_of_int,drop=FALSE]),var_of_int]+cumsum(f_3a)[,4]
-upper_ <- raw[rownames(newDF_t[nrow(newDF_t),var_of_int,drop=FALSE]),var_of_int]+cumsum(f_3a)[,5]
+mean_ <- nv_diff_sets(sndif_[which(colnames(raw)==var_of_int)],ndif_[which(colnames(raw)==var_of_int)],raw[rownames(newDF_t),var_of_int,drop=FALSE],season,c(f_3a$`Point Forecast`))
+lower_ <- nv_diff_sets(sndif_[which(colnames(raw)==var_of_int)],ndif_[which(colnames(raw)==var_of_int)],raw[rownames(newDF_t),var_of_int,drop=FALSE],season,c(f_3a$'Lo 95'))
+upper_ <- nv_diff_sets(sndif_[which(colnames(raw)==var_of_int)],ndif_[which(colnames(raw)==var_of_int)],raw[rownames(newDF_t),var_of_int,drop=FALSE],season,c(f_3a$'Hi 95'))
+
 actual_ <- raw[rownames(actual),var_of_int,drop=FALSE]
 
 df <- data.frame(time = anydate(rownames(newDF_t)[1:length(mean_)]), actual_, mean_,lower_,upper_)
@@ -517,7 +523,8 @@ df <- melt(df ,  id.vars = 'time', variable.name = 'series')
 ggplot(df, aes(time,value)) + geom_line(aes(colour = series))
 
 
-nv_diff_sets(sndif_[which(colnames(raw)==var_of_int)],ndif_[which(colnames(raw)==var_of_int)],raw[rownames(newDF_t),var_of_int,drop=FALSE],season,c(f_3a$`Point Forecast`))
+
+
 
 
 ```
