@@ -16,11 +16,13 @@ invisible(lapply(packages, library, character.only = TRUE))
 
 ```{r}
 #data
-raw <- read.csv("C:/Users/User/Documents/wiki/wiki/dev/python/Python-Stock/data/combined_set.csv",row.names=1,header=TRUE)
+raw <- read.csv("https://raw.githubusercontent.com/thistleknot/Python-Stock/master/data/combined_set.csv",row.names=1,header=TRUE)
 ```
 
 ```{r}
 #functions
+`%notin%` <- Negate(`%in%`)
+
 PCOR <- function(x, type = c("raw", "cor")) {		 
 		  type <- match.arg(type)
 		  if (type == "raw") {		
@@ -53,7 +55,82 @@ critical.r <- function( n, alpha = .05 ) {
   return(critical.r)
 }
 
-`%notin%` <- Negate(`%in%`)
+nv_diff_sets <- function(s,d,y,season=4,nv=NA)
+{
+  '
+  d=1
+  s=1
+  y=raw[,"CSUSHPINSA",drop=FALSE]
+  nv=c(6,7)
+  '
+  temp <- y
+  
+  set <- temp
+  
+  if(s==1)
+  {
+    
+    #apply seasonal difference
+    #temp <- as.data.frame(unlist(lapply((temp-dplyr::lag(temp,1*season)),function(x){ifelse(is.nan(x),return(0),return(x))})))
+    temp <- temp-dplyr::lag(temp,1*season)
+    
+    colnames(temp) <- c("s")
+    
+    set <- cbind(set, temp)
+  }
+   
+  for (d in 1:d)
+  {#d=1
+    
+    temp <- temp-dplyr::lag(temp,1)
+    colnames(temp) <- d
+    set <- cbind(set, temp)
+    
+  }
+  
+  rownames(set) <- rownames(y)
+  #extended <- c(temp_4,tail(c(c(temp_3),tail(temp_4,1)+cumsum(tail(temp_3,1)+cumsum(nv))),length(nv)))
+ 
+  if (d==1&s==1)
+  {
+    temp3 <- dplyr::lag(set[,"s"],1)+set[,"1"]
+    newSet <- dplyr::lag(set[,colnames(y)] ,season) + temp3
+    
+    ns_nt3 <- tail(set[,"s"],1)+cumsum(nv)
+    extended <- head(tail(set[,colnames(y)],season),length(ns_nt3))+ns_nt3
+    
+  }else if (d==2&s==0) 
+    {
+    temp3 <- dplyr::lag(set[,"1"],1)+set[,"2"]
+    #newSet <- (dplyr::lag(set[,1] ,1) + temp3)
+    
+    temp3[is.na(temp3)]=0
+    cs <- cumsum(temp3)
+    newSet <- set[1,1] + cs
+    set <- cbind(set,temp3,cs,newSet)
+    
+    extended <- tail(set[,"cs"],1)+set[1,1]+cumsum(nv)
+    
+  } else if (d==1&s==0)
+  {
+    temp3 <- set[,"1"]
+    
+    temp3[is.na(temp3)]=0
+    cs <- cumsum(temp3)
+    newSet <- set[1,1] + cs
+    set <- cbind(set,temp3,cs,newSet)
+    
+    extended <- tail(set[,"cs"],1)+set[1,1]+cumsum(nv)
+    
+    #newSet <- (dplyr::lag(set[,1] ,1) + temp3)
+    
+  }
+  
+  
+  return(extended)
+  
+}
+
 
 ```
 
@@ -124,36 +201,14 @@ combo_d <- do.call(cbind,lapply(1:length(ndif_),function(d)
     return(temp)
 }))
 
-#do cumsum to find out the reconstructed value at any given position
-reconstruct <- do.call(cbind,lapply(1:length(ndif_),function(d)
-{#d=8
-  
-  temp <- raw[,d,drop=FALSE]
-  
-  set <- temp
-  
-  for (d_ in 1:ndif_[d])
-  {#d_=1
-    
-    temp <- as.data.frame(unlist(lapply((temp-dplyr::lag(temp,1)),function(x){ifelse(is.nan(x),return(0),return(x))})))
-    colnames(temp) <- d_
-    set <- cbind(set, temp)
-    
-  }
-  
-  rownames(set) <- rownames(combo_d)
-  
-  reconstructed <- as.data.frame(c(unlist(lapply(rbind(1:(ncol(set)-1)),function(r_)
-  {#r_=3
-    (set[r_,r_])
-  })),set[(ndif_[d]+1):nrow(set),ncol(set)]))
-  
-  colnames(reconstructed)<-colnames(raw[,d,drop=FALSE])
-  rownames(reconstructed) <- rownames(combo_d)
-  
-  return(reconstructed)
-  
-}))
+
+which(((ndif_==2)*(sndif_==1))==1)
+
+colnames(raw)[which(((ndif_==2)*(sndif_==0))==1)[1]]
+colnames(raw)[which(((ndif_==1)*(sndif_==1))==1)[1]]
+colnames(raw)[which(((ndif_==1)*(sndif_==0))==1)[1]]
+
+colnames(raw$MSPUS)
 
 #multiplicative (returns) to log
 
@@ -370,7 +425,7 @@ for(h in c(var_of_int,winners))
 }
 
 lm_raw <- lm(na.omit(newDF_t[,c(var_of_int,winners),drop=FALSE]))
-summary(lm_raw)
+#summary(lm_raw)
 
 na.omit(newDF_t[,c(var_of_int,winners),drop=FALSE])
 
@@ -388,9 +443,9 @@ f <- as.formula(paste(var_of_int, " ~."))
 
 lm_ <- lm(f, data=na.omit(newDF_t[,c(var_of_int,winners)]))
 
-summary(lm_)
+#summary(lm_)
 
-checkresiduals(lm_$residuals)
+#checkresiduals(lm_$residuals)
 
 actual <- newDF_h[1:horizon,var_of_int,drop=FALSE]
 
@@ -460,6 +515,10 @@ df <- data.frame(time = anydate(rownames(newDF_t)[1:length(mean_)]), actual_, me
 df <- melt(df ,  id.vars = 'time', variable.name = 'series')
 
 ggplot(df, aes(time,value)) + geom_line(aes(colour = series))
+
+
+nv_diff_sets(sndif_[which(colnames(raw)==var_of_int)],ndif_[which(colnames(raw)==var_of_int)],raw[rownames(newDF_t),var_of_int,drop=FALSE],season,c(f_3a$`Point Forecast`))
+
 
 ```
 
