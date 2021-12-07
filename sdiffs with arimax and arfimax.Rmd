@@ -152,6 +152,7 @@ season = switch(
 
 #plot(raw$GDPC1)
 #var_of_int <- "MSPUS"
+#sort(colnames(raw))
 var_of_int <- "GDPC1"
 ```
 
@@ -542,59 +543,62 @@ lm_ <- lm(f, data=na.omit(newDF_t[,c(var_of_int,winners)]))
 actual <- newDF_h[1:horizon,var_of_int,drop=FALSE]
 
 #straight arima of y
-test_0 <- auto.arima(newDF_t[,var_of_int,drop=FALSE])
+models <- list(
+  auto.arima(newDF_t[,var_of_int,drop=FALSE]),
+  auto.arima(lm_$residuals),
+  arfima(lm_$residuals),
+  auto.arima(newDF_t[,var_of_int,drop=FALSE],xreg=lm_$residuals)
+)
 
-f_0 <- as.data.frame(forecast(test_0,h=horizon))
+forecasts <- list(
+  {
+    f_0 <- as.data.frame(forecast(models[[1]],h=horizon))
+    rownames(f_0) <- rownames(actual)
+    f_0
+  },
+  {
+    #arima of lm residuals
+    f_1 <- as.data.frame(forecast(models[[3]],h=horizon))
+    f_1a <- f_1 + t(predict(lm_,newdata=newDF_h[1:horizon,winners,drop=FALSE]))
+    rownames(f_1a) <- rownames(actual)
+    f_1a
+  },
+  {
+    #arfima of residuals
+    f_2 <- as.data.frame(forecast(models[[3]],h=horizon))
+    f_2a <- f_2 + t(predict(lm_,newdata=newDF_h[1:horizon,winners,drop=FALSE]))
+    rownames(f_2a) <- rownames(actual)
+    f_2a
+  },
+  {
+    #arima exogenous
+    f_3_lm_r <- forecast(lm_, newDF_h[1:horizon,winners,drop=FALSE], h=horizon)
+    #test_4 <- arfima(newDF_t[,var_of_int,drop=FALSE],xreg=lm_$residuals,estim=c("mle"))
+    f_3a <- as.data.frame(forecast(models[[4]],h=horizon,xreg=f_3_lm_r$mean))
+    #lapply(c(2,3,4),function(x){f_3_lm_r[names(f_3_lm_r)[x]]})
+    #rownames(f_3a)
+    rownames(f_3a) <- rownames(actual)
+    f_3a
+  }
+)
 
-#arima of lm residuals
-test_1 <- auto.arima(lm_$residuals)
+errors <- list(
+  mean(abs(forecasts[[1]]$`Point Forecast`-t(actual))),
+  mean(abs(forecasts[[2]]$`Point Forecast`-t(actual))),
+  mean(abs(forecasts[[3]]$`Point Forecast`-t(actual))),
+  mean(abs(forecasts[[4]]$`Point Forecast`-t(actual)))
+)
 
-f_1 <- as.data.frame(forecast(test_1,h=horizon))
+for (e in 1:length(errors))
+{
+  print(paste("error forecast:", e, errors[[e]]))
+}
 
-f_1a <- f_1 + t(predict(lm_,newdata=newDF_h[1:horizon,winners,drop=FALSE]))
+which.min(errors)
 
-rownames(f_1a) <- rownames(actual)
-
-#arfima of residuals
-test_2 <- arfima(lm_$residuals)
-
-f_2 <- as.data.frame(forecast(test_2,h=horizon))
-
-f_2a <- f_2 + t(predict(lm_,newdata=newDF_h[1:horizon,winners,drop=FALSE]))
-
-#arima exogenous
-test_3 <- auto.arima(newDF_t[,var_of_int,drop=FALSE],xreg=lm_$residuals)
-
-f_3_lm_r <- forecast(lm_, newDF_h[1:horizon,winners,drop=FALSE], h=horizon)
-
-#test_4 <- arfima(newDF_t[,var_of_int,drop=FALSE],xreg=lm_$residuals,estim=c("mle"))
-
-f_3a <- as.data.frame(forecast(test_3,h=horizon,xreg=f_3_lm_r$mean))
-
-#lapply(c(2,3,4),function(x){f_3_lm_r[names(f_3_lm_r)[x]]})
-
-#rownames(f_3a)
-
-rownames(f_1a) <- rownames(actual)
-rownames(f_2a) <- rownames(actual)
-rownames(f_3a) <- rownames(actual)
-
-e_f_0 <- mean(abs(f_0$`Point Forecast`-t(actual)))
-e_f_1a <- mean(abs(f_1a$`Point Forecast`-t(actual)))
-e_f_2a <- mean(abs(f_2a$`Point Forecast`-t(actual)))
-e_f_3a <- mean(abs(f_3a$`Point Forecast`-t(actual)))
-
-print(paste("error forecast 0:", e_f_0))
-
-print(paste("error forecast 1:", e_f_1a))
-
-print(paste("error forecast 2:", e_f_2a))
-
-print(paste("error forecast 3:", e_f_3a))
-
-mean_ <- nv_diff_sets(sndif_[which(colnames(raw)==var_of_int)],ndif_[which(colnames(raw)==var_of_int)],raw[rownames(newDF_t),var_of_int,drop=FALSE],season,c(f_3a$`Point Forecast`))
-lower_ <- nv_diff_sets(sndif_[which(colnames(raw)==var_of_int)],ndif_[which(colnames(raw)==var_of_int)],raw[rownames(newDF_t),var_of_int,drop=FALSE],season,c(f_3a$'Lo 95'))
-upper_ <- nv_diff_sets(sndif_[which(colnames(raw)==var_of_int)],ndif_[which(colnames(raw)==var_of_int)],raw[rownames(newDF_t),var_of_int,drop=FALSE],season,c(f_3a$'Hi 95'))
+mean_ <- nv_diff_sets(sndif_[which(colnames(raw)==var_of_int)],ndif_[which(colnames(raw)==var_of_int)],raw[rownames(newDF_t),var_of_int,drop=FALSE],season,c(forecasts[[which.min(errors)]]$`Point Forecast`))
+lower_ <- nv_diff_sets(sndif_[which(colnames(raw)==var_of_int)],ndif_[which(colnames(raw)==var_of_int)],raw[rownames(newDF_t),var_of_int,drop=FALSE],season,c(forecasts[[which.min(errors)]]$'Lo 95'))
+upper_ <- nv_diff_sets(sndif_[which(colnames(raw)==var_of_int)],ndif_[which(colnames(raw)==var_of_int)],raw[rownames(newDF_t),var_of_int,drop=FALSE],season,c(forecasts[[which.min(errors)]]$'Hi 95'))
 
 actual_ <- raw[rownames(actual),var_of_int,drop=FALSE]
 
@@ -613,26 +617,43 @@ fore_data <- na.omit(newDF[,c(var_of_int,winners)])
 
 lm_a <- lm(f, data=fore_data)
 
-#length(lm_a$residuals)
-#View(lm_a$residuals)
-#nrow(na.omit(newDF[,c(var_of_int,winners)]))
-
-#plot(lm_a$residuals)
-
-forecast_a <- auto.arima(fore_data[,var_of_int,drop=FALSE],xreg=lm_a$residuals)
-newDF[,c(var_of_int,winners)]
-
-#h=max(differences[1,2:length(colnames(differences))
-f_3_lm_r_a <- forecast(lm_a, fore_data, h=horizon)
-
-#test_4 <- arfima(newDF_t[,var_of_int,drop=FALSE],xreg=lm_$residuals,estim=c("mle"))
-
-f_3a_a <- as.data.frame(forecast(forecast_a,h=horizon,xreg=f_3_lm_r_a$mean))
+#straight arima of y
+models_a <- list(
+  auto.arima(fore_data[,var_of_int,drop=FALSE]),
+  auto.arima(lm_a$residuals),
+  arfima(lm_a$residuals),
+  auto.arima(fore_data[,var_of_int,drop=FALSE],xreg=lm_a$residuals)
+)
 
 
-mean_ <- nv_diff_sets(sndif_[which(colnames(raw)==var_of_int)],ndif_[which(colnames(raw)==var_of_int)],raw[rownames(newDF),var_of_int,drop=FALSE],season,c(f_3a$`Point Forecast`))
-lower_ <- nv_diff_sets(sndif_[which(colnames(raw)==var_of_int)],ndif_[which(colnames(raw)==var_of_int)],raw[rownames(newDF),var_of_int,drop=FALSE],season,c(f_3a$'Lo 95'))
-upper_ <- nv_diff_sets(sndif_[which(colnames(raw)==var_of_int)],ndif_[which(colnames(raw)==var_of_int)],raw[rownames(newDF),var_of_int,drop=FALSE],season,c(f_3a$'Hi 95'))
+forecasts_a <- list(
+  {
+    f_0 <- as.data.frame(forecast(models_a[[1]],h=horizon))
+    f_0
+  },
+  {
+    #arima of lm residuals
+    f_1 <- as.data.frame(forecast(models_a[[2]],h=horizon))
+    f_1
+  },
+  {
+    #arfima of residuals
+    f_2 <- as.data.frame(forecast(models_a[[3]],h=horizon))
+    f_2
+  },
+  {
+    #arima exogenous
+    #residuals
+    f_3 <- forecast(auto.arima(lm_a$residuals), h=horizon)
+    #by selecting models[[4]], it's going to forecast y
+    f_3a <- forecast(models[[4]],xreg=f_3$mean)
+    f_3a
+  }
+)
+
+mean_ <- nv_diff_sets(sndif_[which(colnames(raw)==var_of_int)],ndif_[which(colnames(raw)==var_of_int)],raw[rownames(newDF),var_of_int,drop=FALSE],season,c(forecasts_a[[which.min(errors)]]$`Point Forecast`))
+lower_ <- nv_diff_sets(sndif_[which(colnames(raw)==var_of_int)],ndif_[which(colnames(raw)==var_of_int)],raw[rownames(newDF),var_of_int,drop=FALSE],season,c(forecasts_a[[which.min(errors)]]$'Lo 95'))
+upper_ <- nv_diff_sets(sndif_[which(colnames(raw)==var_of_int)],ndif_[which(colnames(raw)==var_of_int)],raw[rownames(newDF),var_of_int,drop=FALSE],season,c(forecasts_a[[which.min(errors)]]$'Hi 95'))
 
 #actual_f <- raw[rownames(actual),var_of_int,drop=FALSE]
 
@@ -644,7 +665,7 @@ anydate(rownames(newDF))[length(rownames(newDF))]+days(91.4*5)
 )
 
 #lubridate::ceiling_date(Sys.Date(), unit = "month")
-        
+      
 df_a <- data.frame(time = newDates, mean_,lower_,upper_)
 
 df_a <- melt(df_a ,  id.vars = 'time', variable.name = 'series')
