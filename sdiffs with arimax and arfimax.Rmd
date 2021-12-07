@@ -1,7 +1,7 @@
 ```{r}
 #packages
 {
-packages <- c("dplyr","ggplot2","quantmod","zoo","plyr","forecast","tseries","tidyverse","furrr","reshape","lubridate","anytime","car","caret","ppcor","whitening","TSA","corrplot")
+packages <- c("dplyr","ggplot2","quantmod","zoo","plyr","forecast","tseries","tidyverse","furrr","reticulate","geometry","reshape","lubridate","anytime","car","caret","ppcor","whitening","TSA","corrplot")
 
 # Install packages not yet installed
 installed_packages <- packages %in% rownames(installed.packages())
@@ -130,21 +130,35 @@ nv_diff_sets <- function(s,d,y,season=4,nv=NA)
   
 }
 
-'
 ZCA_svd <- function(x)
 {
-  #x=subset[,2:length(colnames(subset))]
-  x_c = x - colMeans(x)
-  sigma = cov(x)
-  l = svd(x)
-  View(l)
-  u = l$v #$vectors
-  l_ = l$d
-  x_rot = as.matrix(x_c)%*%u
-  x_white = x_rot / sqrt(l_)
-  return(x_white)
+  internal <- svd(x)
+  
+  U = internal$u
+  #print(U)
+  Vt = internal$v
+  #print(Vt)
+  s = internal$d
+  #U, s, Vt = np.linalg.svd(X, full_matrices=False)
+
+  # U and Vt are the singular matrices, and s contains the singular values.
+  # Since the rows of both U and Vt are orthonormal vectors, then U * Vt
+  # will be white
+  
+  #dot(U,Vt)
+  X_white = U%*%Vt
+  #np$dot(U,Vt)
+  #
+
+  return(X_white)
 }
-'
+
+
+
+```
+
+```{r}
+
 ```
 
 ```{r}
@@ -164,6 +178,89 @@ season = switch(
 #plot(raw$GDPC1)
 #var_of_int <- "MSPUS"
 var_of_int <- "GDPC1"
+```
+
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{python}
+import numpy as np
+import pandas as pd
+
+def white(flat_x):
+  # Calculate principal components
+  sigma = np.dot(flat_x.T, flat_x) / flat_x.shape[0]
+  u, s, _ = np.linalg.svd(sigma)
+  principal_components = np.dot(np.dot(u, np.diag(1.0 / np.sqrt(s + 10e-7))), u.T)
+  # Apply ZCA whitening
+  whitex = np.dot(flat_x, principal_components)
+  return(whitex)
+
+def svd_whiten(X):
+  U, s, Vt = np.linalg.svd(X, full_matrices=False)
+  # U and Vt are the singular matrices, and s contains the singular values.
+  # Since the rows of both U and Vt are orthonormal vectors, then U * Vt
+  # will be white
+  X_white = np.dot(U, Vt)
+  return X_white
+
+def flatten_matrix(matrix):
+  vector = matrix.flatten(1)
+  vector = vector.reshape(1, len(vector))
+  return vector
+
+def zca_whitening_matrix(X):
+  """
+  Function to compute ZCA whitening matrix (aka Mahalanobis whitening).
+  INPUT:  X: [M x N] matrix.
+      Rows: Variables
+      Columns: Observations
+  OUTPUT: ZCAMatrix: [M x M] matrix
+  """
+  # Covariance matrix [column-wise variables]: Sigma = (X-mu)' * (X-mu) / N
+  sigma = np.cov(X, rowvar=True) # [M x M]
+  # Singular Value Decomposition. X = U * np.diag(S) * V
+  U,S,V = np.linalg.svd(sigma)
+      # U: [M x M] eigenvectors of sigma.
+      # S: [M x 1] eigenvalues of sigma.
+      # V: [M x M] transpose of U
+  # Whitening constant: prevents division by zero
+  epsilon = 1e-5
+  # ZCA Whitening matrix: U * Lambda * U'
+  ZCAMatrix = np.dot(U, np.dot(np.diag(1.0/np.sqrt(S + epsilon)), U.T)) # [M x M]
+  return ZCAMatrix
+
+def zca_whitening(inputs):
+  sigma = np.dot(inputs, inputs.T)/inputs.shape[1] #Correlation matrix
+  U,S,V = np.linalg.svd(sigma) #Singular Value Decomposition
+  epsilon = 0.1                #Whitening constant, it prevents division by zero
+  ZCAMatrix = np.dot(np.dot(U, np.diag(1.0/np.sqrt(np.diag(S) + epsilon))), U.T)                     #ZCA Whitening matrix
+  return np.dot(ZCAMatrix, inputs)   #Data whitening
+  
+  
+```
+
+```{r}
+if(FALSE)
+{
+  x_ = read.csv(file="https://raw.githubusercontent.com/thistleknot/Python-Stock/master/data/raw/states.csv",header =TRUE,row.names = 1)
+
+x = x_[,2:ncol(x_)]
+corrplot(cor(cbind(x_[,1,drop=FALSE],as.data.frame(ZCA_svd(x)))))
+py$svd_whiten(x_[,2:ncol(x_)])
+
+np <- import("numpy")
+
+np$dot(py$zca_whitening_matrix(as.matrix(x_[,2:ncol(x_)])),as.matrix(x_[,2:ncol(x_)]))
+py$white(x_[,2:ncol(x_)])
+  
+}
 
 ```
 
@@ -309,7 +406,7 @@ for(c in 1:(length(colnames(training))))
   if(max.cor>critical.r( ccf1$n.used ))
   {
     
-    if(lag.opt>0)
+    if(lag.opt>=0)
     {
       names <- c(names,(colnames(training)[c]))
       print(colnames(training)[c])
@@ -384,7 +481,9 @@ subset = newDF_t[,c(colnames(newDF_t) %notin% c(exclude))]
 
 #View(sort((t(summary(subset))[,4])))
 
-subset_w <- cbind(subset[,var_of_int,drop=FALSE],as.data.frame(whiten(as.matrix(subset[,c(colnames(newDF_t) %notin% c(var_of_int))]), method=c("ZCA"))))
+#subset_w <- cbind(subset[,var_of_int,drop=FALSE],as.data.frame(whiten(as.matrix(subset[,c(colnames(newDF_t) %notin% c(var_of_int))]), method=c("ZCA"))))
+
+subset_w <- cbind(subset[,var_of_int,drop=FALSE],as.data.frame(py$white(as.matrix(subset[,c(colnames(newDF_t) %notin% c(var_of_int))]))))
 colnames(subset_w) <- colnames(subset)
 rownames(subset_w) <- rownames(subset)
 
@@ -417,7 +516,8 @@ while(max_pvalue>=p_threshold)
     }
     else
     {
-      temp_ <- cbind(subset_w[,var_of_int,drop=FALSE],as.data.frame(whiten(as.matrix(temp[,c(colnames(temp) %notin% c(var_of_int))]), method=c("ZCA"))))
+      #temp_ <- cbind(subset_w[,var_of_int,drop=FALSE],as.data.frame(whiten(as.matrix(temp[,c(colnames(temp) %notin% c(var_of_int))]), method=c("ZCA"))))
+      temp_ <- cbind(subset_w[,var_of_int,drop=FALSE],as.data.frame(py$white(as.matrix(temp[,c(colnames(temp) %notin% c(var_of_int))]))))
       #temp_ <- cbind(subset[,var_of_int,drop=FALSE],temp[,c(colnames(temp) %notin% c(var_of_int))])
       
   colnames(temp_) <- colnames(temp)
