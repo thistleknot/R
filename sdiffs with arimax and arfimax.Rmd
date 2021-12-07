@@ -130,31 +130,6 @@ nv_diff_sets <- function(s,d,y,season=4,nv=NA)
   
 }
 
-ZCA_svd <- function(x)
-{
-  internal <- svd(x)
-  
-  U = internal$u
-  #print(U)
-  Vt = internal$v
-  #print(Vt)
-  s = internal$d
-  #U, s, Vt = np.linalg.svd(X, full_matrices=False)
-
-  # U and Vt are the singular matrices, and s contains the singular values.
-  # Since the rows of both U and Vt are orthonormal vectors, then U * Vt
-  # will be white
-  
-  #dot(U,Vt)
-  X_white = U%*%Vt
-  #np$dot(U,Vt)
-  #
-
-  return(X_white)
-}
-
-
-
 ```
 
 ```{r}
@@ -192,76 +167,42 @@ var_of_int <- "GDPC1"
 ```{python}
 import numpy as np
 import pandas as pd
+from sklearn.utils import as_float_array
+from sklearn.base import TransformerMixin, BaseEstimator
 
-def white(flat_x):
-  # Calculate principal components
-  sigma = np.dot(flat_x.T, flat_x) / flat_x.shape[0]
-  u, s, _ = np.linalg.svd(sigma)
-  principal_components = np.dot(np.dot(u, np.diag(1.0 / np.sqrt(s + 10e-7))), u.T)
-  # Apply ZCA whitening
-  whitex = np.dot(flat_x, principal_components)
-  return(whitex)
-
-def svd_whiten(X):
-  U, s, Vt = np.linalg.svd(X, full_matrices=False)
-  # U and Vt are the singular matrices, and s contains the singular values.
-  # Since the rows of both U and Vt are orthonormal vectors, then U * Vt
-  # will be white
-  X_white = np.dot(U, Vt)
-  return X_white
-
-def flatten_matrix(matrix):
-  vector = matrix.flatten(1)
-  vector = vector.reshape(1, len(vector))
-  return vector
-
-def zca_whitening_matrix(X):
-  """
-  Function to compute ZCA whitening matrix (aka Mahalanobis whitening).
-  INPUT:  X: [M x N] matrix.
-      Rows: Variables
-      Columns: Observations
-  OUTPUT: ZCAMatrix: [M x M] matrix
-  """
-  # Covariance matrix [column-wise variables]: Sigma = (X-mu)' * (X-mu) / N
-  sigma = np.cov(X, rowvar=True) # [M x M]
-  # Singular Value Decomposition. X = U * np.diag(S) * V
-  U,S,V = np.linalg.svd(sigma)
-      # U: [M x M] eigenvectors of sigma.
-      # S: [M x 1] eigenvalues of sigma.
-      # V: [M x M] transpose of U
-  # Whitening constant: prevents division by zero
-  epsilon = 1e-5
-  # ZCA Whitening matrix: U * Lambda * U'
-  ZCAMatrix = np.dot(U, np.dot(np.diag(1.0/np.sqrt(S + epsilon)), U.T)) # [M x M]
-  return ZCAMatrix
-
-def zca_whitening(inputs):
-  sigma = np.dot(inputs, inputs.T)/inputs.shape[1] #Correlation matrix
-  U,S,V = np.linalg.svd(sigma) #Singular Value Decomposition
-  epsilon = 0.1                #Whitening constant, it prevents division by zero
-  ZCAMatrix = np.dot(np.dot(U, np.diag(1.0/np.sqrt(np.diag(S) + epsilon))), U.T)                     #ZCA Whitening matrix
-  return np.dot(ZCAMatrix, inputs)   #Data whitening
-  
-  
+class ZCA(BaseEstimator, TransformerMixin):
+  def __init__(self, regularization=1e-5, copy=False):
+      self.regularization = regularization
+      self.copy = copy
+  def fit(self, X, y=None):
+      X = as_float_array(X, copy=self.copy)
+      self.mean_ = np.mean(X, axis=0)
+      X = X - self.mean_
+      sigma = np.dot(X.T, X) / (X.shape[0] - 1)
+      U, S, V = np.linalg.svd(sigma)
+      tmp = np.dot(U, np.diag(1 / np.sqrt(S + self.regularization)))
+      self.components_ = np.dot(tmp, U.T)
+      return self
+  def transform(self, X):
+      X_transformed = X - self.mean_
+      X_transformed = np.dot(X_transformed, self.components_.T)
+      return X_transformed  
+    
 ```
 
 ```{r}
+#test python functions
 if(FALSE)
 {
-  x_ = read.csv(file="https://raw.githubusercontent.com/thistleknot/Python-Stock/master/data/raw/states.csv",header =TRUE,row.names = 1)
-
-x = x_[,2:ncol(x_)]
-corrplot(cor(cbind(x_[,1,drop=FALSE],as.data.frame(ZCA_svd(x)))))
-py$svd_whiten(x_[,2:ncol(x_)])
-
-np <- import("numpy")
-
-np$dot(py$zca_whitening_matrix(as.matrix(x_[,2:ncol(x_)])),as.matrix(x_[,2:ncol(x_)]))
-py$white(x_[,2:ncol(x_)])
+  x <- read.csv(file="https://raw.githubusercontent.com/thistleknot/Python-Stock/master/data/raw/states.csv", header = TRUE, row.names = 1)
+  x_ <- x[,2:ncol(x)]
   
+  zca <- py$ZCA()
+  
+  zca$fit_transform(x_)
+  
+  py$zca1(as.matrix(x[,2:ncol(x)]))
 }
-
 ```
 
 ```{r}
@@ -481,9 +422,14 @@ subset = newDF_t[,c(colnames(newDF_t) %notin% c(exclude))]
 
 #View(sort((t(summary(subset))[,4])))
 
-#subset_w <- cbind(subset[,var_of_int,drop=FALSE],as.data.frame(whiten(as.matrix(subset[,c(colnames(newDF_t) %notin% c(var_of_int))]), method=c("ZCA"))))
+#subset_w <- cbind(subset[,var_of_int,drop=FALSE],as.data.frame(whiten(as.matrix(subset[,c(colnames(newDF_t) %notin% c(var_of_int))]),center=TRUE, method=c("ZCA"))))
 
-subset_w <- cbind(subset[,var_of_int,drop=FALSE],as.data.frame(py$white(as.matrix(subset[,c(colnames(newDF_t) %notin% c(var_of_int))]))))
+zca <- py$ZCA()
+
+#zca$fit_transform(x)
+#corrplot(cor(zca$transform(x)))
+
+subset_w <- cbind(subset[,var_of_int,drop=FALSE],as.data.frame(zca$fit_transform(as.matrix(subset[,c(colnames(newDF_t) %notin% c(var_of_int))]))))
 colnames(subset_w) <- colnames(subset)
 rownames(subset_w) <- rownames(subset)
 
@@ -516,8 +462,9 @@ while(max_pvalue>=p_threshold)
     }
     else
     {
-      #temp_ <- cbind(subset_w[,var_of_int,drop=FALSE],as.data.frame(whiten(as.matrix(temp[,c(colnames(temp) %notin% c(var_of_int))]), method=c("ZCA"))))
-      temp_ <- cbind(subset_w[,var_of_int,drop=FALSE],as.data.frame(py$white(as.matrix(temp[,c(colnames(temp) %notin% c(var_of_int))]))))
+      zca <- py$ZCA()
+      temp_ <- cbind(subset_w[,var_of_int,drop=FALSE],as.data.frame(zca$fit_transform(as.matrix(temp[,c(colnames(temp) %notin% c(var_of_int))]))))
+      #temp_ <- cbind(subset_w[,var_of_int,drop=FALSE],as.data.frame(py$white(as.matrix(temp[,c(colnames(temp) %notin% c(var_of_int))]))))
       #temp_ <- cbind(subset[,var_of_int,drop=FALSE],temp[,c(colnames(temp) %notin% c(var_of_int))])
       
   colnames(temp_) <- colnames(temp)
@@ -533,10 +480,10 @@ sig_table = sig_table + as.integer(colnames(newDF_t) %in% winners)
 
 #t_ <- t(pcor(subset[,c(var_of_int,winners)], method = c("spearman"))$estimate[,var_of_int,drop=FALSE])[,-1]
 
-#corrplot(cor(subset_w[,c(var_of_int,winners)]))
+corrplot(cor(subset_w[,c(var_of_int,winners)]))
 
 #corrplot(PCOR(subset[,c(var_of_int,winners),drop=FALSE]))
-corrplot(PCOR(subset_w[,c(var_of_int,winners)]))
+#corrplot(PCOR(subset_w[,c(var_of_int,winners)]))
 
 #View(subset[,c(var_of_int,winners)])
 '
@@ -710,5 +657,5 @@ ggplot(df_a, aes(time,value)) + geom_line(aes(colour = variable))
 
 ```{r}
 
-
+differences
 ```
