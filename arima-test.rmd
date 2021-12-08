@@ -1,0 +1,76 @@
+```{r}
+library(forecast)
+```
+
+```{r}
+df <- read.csv(file="C:/Users/User/Documents/wiki/wiki/Excel/arimax_test_data.csv", header = T)
+df_t <- df[1:20,]
+df_h <- df[21:23,]
+```
+
+```{r}
+df_t_diff <- as.data.frame(cbind(diff(df_t[,1,],1),diff(df_t[,2,],1),diff(df_t[,3,],1)))
+colnames(df_t_diff) <- colnames(df_t)
+```
+```{r}
+
+df_t_diff_lm <- lm(Y~.,data=df_t_diff)
+
+df_t_lm_c <- lm(Y~.,data=df_t)
+
+auto.arima(df_t_lm_c$residuals)
+
+df_t_lm <- lm(I(Y~0 +.),data=df_t)
+
+#acf(df_t_lm$residuals)
+
+#ar_ <- arima(df_t_lm$residuals,order=c(0,0,1),include.mean = 0)
+#ar_$residuals
+#dplyr::lag(df_t_lm$residuals $,1)*ar_$coef
+
+#ar_ <- auto.arima(df_t_lm$residuals)
+
+
+#acf(df_t_lm$residuals,plot=FALSE)
+
+
+
+#ar_1 <- arima(df_t[,3],order = c(0,0,1), xreg = as.matrix(df_t[,1:2]))
+#ar_1 <- auto.arima(df_t[,3],xreg = df_t[,1:2])
+
+w_constant <- as.data.frame(cbind(matrix(1,nrow = nrow(df_t)),df_t[,1:2]))
+
+colnames(w_constant) <- c("C",colnames(df_t[,1:2]))
+ar_1 <- auto.arima(df_t[,3], xreg = as.matrix(w_constant))
+
+ar_1$residuals
+
+auto.arima(df_t_lm$residuals)
+
+ar_0 <- auto.arima(df_t[,3], xreg = as.matrix(w_constant))
+View(w_constant)
+#ar_1$fitted
+#cbind(df_t[,1]*ar_1$coef[1],df_t[,2]*ar_1$coef[2])
+#f_ <- forecast(ar_1, xreg = as.matrix(df_h[,1:2]))
+
+acf(ar_$residuals)
+
+temp <- c(0,df_t_lm$residuals)
+res_ <- matrix(0,nrow=length(temp))
+
+for (t in 2:length(temp))
+{
+  res_[t] <- temp[t]-res_[t-1]*ar_$coef
+  
+}
+
+pred <- res_-temp
+
+numfore <- 2
+pred <- c(pred,tail(res_,1)*ar_$coef)
+for (n in 1:numfore)
+{
+  pred <- c(pred,)
+}
+```
+

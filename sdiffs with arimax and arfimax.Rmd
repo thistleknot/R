@@ -154,6 +154,7 @@ season = switch(
 #var_of_int <- "MSPUS"
 #sort(colnames(raw))
 var_of_int <- "GDPC1"
+#var_of_int <- "LXXRCSA"
 ```
 
 
@@ -338,35 +339,38 @@ for(c in 1:(length(colnames(training))))
   
   ccf1 <- ccf(training[,var_of_int,drop=FALSE],training[,c], lag.max = season, correlation=TRUE, plot=FALSE)
   
-  upperCI <- qnorm((1+0.95)/2)/sqrt(ccf1$n.used)
-  lowerCI <- -qnorm((1+0.95)/2)/sqrt(ccf1$n.used)
+  crit = critical.r(ccf1$n.used)
   
-  ind.max <- which(abs(ccf1$acf)==max(abs(ccf1$acf)))
-  max.cor <- ccf1$acf[ind.max]
-  lag.opt <- ccf1$lag[ind.max] 
+  #upperCI <- qnorm((1+0.95)/2)/sqrt(ccf1$n.used)
+  #lowerCI <- -qnorm((1+0.95)/2)/sqrt(ccf1$n.used)
   
-  if(max.cor>critical.r( ccf1$n.used ))
+  #ind.max <- which(abs(ccf1$acf)==max(abs(ccf1$acf)))
+  candidates <- which((abs(ccf1$acf)<=crit) & (ccf1$lag >= 1))
+  if(length(candidates)!=0)
   {
-    
-    if(lag.opt>=0)
-    {
-      names <- c(names,(colnames(training)[c]))
-      print(colnames(training)[c])
-      print(lag.opt)
-      print(max.cor)
-      lags <- c(lags,lag.opt)
-      print(2 * (1 - pnorm(abs(max.cor), mean = 0, sd = 1/sqrt(ccf1$n.used))))
-    }
-    
+    which_max <- which.max(abs(ccf1$acf[candidates]))
+    ind.max <- max(abs(ccf1$acf[candidates][which_max]))
+    max.cor <- ccf1$acf[candidates][which_max]
+    lag.opt <- ccf1$lag[candidates][which_max]
+    names <- c(names,(colnames(training)[c]))
+    print(colnames(training)[c])
+    print(lag.opt)
+    print(max.cor)
+    lags <- c(lags,lag.opt)
+    print(2 * (1 - pnorm(abs(max.cor), mean = 0, sd = 1/sqrt(ccf1$n.used))))
   }
+  
 }
 
 #needed if lag.opt>=0
+'
 if(min(lags)==0)
 {
-  names <- names[names %notin% var_of_int]
+  
 }
-
+'
+#remove y (for now until I figure out how to handle the name change)
+names <- names[names %notin% var_of_int]
 
 #lag example
 #cor(na.omit(cbind(training[,var_of_int,],dplyr::lag(training[,"SHY"],2))))
@@ -385,7 +389,7 @@ for (n in 1:length(names))
 }
 
 newDF_t <- na.omit(newDF[1:nrow(training),])
-newDF_h <- na.omit(newDF[(nrow(training)+1):nrow(combo_),])
+newDF_h <- newDF[(nrow(training)+1):nrow(combo_),]
 
 #cor(na.omit(newDF[,c("MSPUS","M1"),]))
 
@@ -431,6 +435,7 @@ zca <- py$ZCA()
 #corrplot(cor(zca$transform(x)))
 
 subset_w <- cbind(subset[,var_of_int,drop=FALSE],as.data.frame(zca$fit_transform(as.matrix(subset[,c(colnames(newDF_t) %notin% c(var_of_int))]))))
+
 colnames(subset_w) <- colnames(subset)
 rownames(subset_w) <- rownames(subset)
 
@@ -547,7 +552,9 @@ models <- list(
   auto.arima(newDF_t[,var_of_int,drop=FALSE]),
   auto.arima(lm_$residuals),
   arfima(lm_$residuals),
-  auto.arima(newDF_t[,var_of_int,drop=FALSE],xreg=lm_$residuals)
+  auto.arima(newDF_t[,var_of_int,drop=FALSE],xreg=lm_$residuals),
+  ets(ts(newDF_t[,var_of_int,drop=FALSE],frequency=season)),
+  auto.arima(newDF_t[,var_of_int,drop=FALSE],xreg=as.matrix(newDF_t[,winners]))
 )
 
 forecasts <- list(
@@ -579,6 +586,17 @@ forecasts <- list(
     #rownames(f_3a)
     rownames(f_3a) <- rownames(actual)
     f_3a
+  },
+  {
+    f_4 <- as.data.frame(forecast(models[[5]],h=horizon))
+    rownames(f_4) <- rownames(actual)
+    f_4
+  },
+  {
+    #proper arimax
+    f_5 <- as.data.frame(forecast(models[[6]], xreg=as.matrix(newDF_h[1:horizon,winners,drop=FALSE]), h=horizon))
+    rownames(f_5) <- rownames(actual)
+    f_5
   }
 )
 
@@ -586,8 +604,12 @@ errors <- list(
   mean(abs(forecasts[[1]]$`Point Forecast`-t(actual))),
   mean(abs(forecasts[[2]]$`Point Forecast`-t(actual))),
   mean(abs(forecasts[[3]]$`Point Forecast`-t(actual))),
-  mean(abs(forecasts[[4]]$`Point Forecast`-t(actual)))
+  mean(abs(forecasts[[4]]$`Point Forecast`-t(actual))),
+  mean(abs(forecasts[[5]]$`Point Forecast`-t(actual))),
+  mean(abs(forecasts[[6]]$`Point Forecast`-t(actual)))
 )
+
+
 
 for (e in 1:length(errors))
 {
@@ -622,7 +644,8 @@ models_a <- list(
   auto.arima(fore_data[,var_of_int,drop=FALSE]),
   auto.arima(lm_a$residuals),
   arfima(lm_a$residuals),
-  auto.arima(fore_data[,var_of_int,drop=FALSE],xreg=lm_a$residuals)
+  auto.arima(fore_data[,var_of_int,drop=FALSE],xreg=lm_a$residuals),
+  ets(ts(fore_data[,var_of_int,drop=FALSE],frequency=season))
 )
 
 
@@ -646,8 +669,12 @@ forecasts_a <- list(
     #residuals
     f_3 <- forecast(auto.arima(lm_a$residuals), h=horizon)
     #by selecting models[[4]], it's going to forecast y
-    f_3a <- forecast(models[[4]],xreg=f_3$mean)
+    f_3a <- forecast(models_a[[4]],xreg=f_3$mean)
     f_3a
+  },
+  {
+    f_4 <- as.data.frame(forecast(models_a[[5]],h=horizon))
+    f_4
   }
 )
 
