@@ -244,14 +244,24 @@ ndif_ <- unlist(lapply(1:(length(colnames(combo_s))),function(n)
 
 combo_d <- do.call(cbind,lapply(1:length(ndif_),function(d)
 {#no if check for 0 because at a minimum I want one difference
-  temp <- combo_s[,d,drop=FALSE]
-    for(dif in 1:ndif_[d])
-    {
-      temp <- as.data.frame(unlist(lapply((temp-dplyr::lag(temp,1)),function(x){ifelse(is.nan(x),return(0),return(x))})))
-      colnames(temp) <- colnames(combo_s[,d,drop=FALSE])
-      rownames(temp) <- rownames(combo_s[,d,drop=FALSE])
-    }
-    return(temp)
+  s=sndif_[d]
+  
+  
+  if(s>0)
+  {
+    d_=ndif_[d]
+    
+    diffset <- diff(diff(raw[,colnames(raw)[d],drop=TRUE],lag=season,differences=s),differences=d_)
+  }else
+  {
+    diffset <- diff(raw[,colnames(raw)[d],drop=TRUE],differences=d_)
+  }
+  
+  properSet <- as.data.frame(c(matrix(NA,nrow=(nrow(raw)-length(diffset))),diffset))
+  colnames(properSet) <- colnames(raw[,colnames(raw)[d],drop=FALSE])
+  rownames(properSet) <- rownames(raw)
+  #View(properSet)  
+  return(properSet)
 }))
 
 
@@ -529,6 +539,10 @@ na.omit(newDF_t[,c(var_of_int,winners),drop=FALSE])
 
 #some seasons
 #na.omit(combo_d[,c(var_of_int,winners),drop=FALSE])
+
+```
+```{r}
+
 
 ```
 
