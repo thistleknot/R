@@ -782,55 +782,63 @@ lm_a <- lm(f, data=fore_data)
 
 fore_data
 
-'
 #straight arima of y
 models_a <- list(
   auto.arima(fore_data[,var_of_int,drop=FALSE]),
-  #auto.arima(lm_a$residuals),
-  #arfima(lm_a$residuals),
-  auto.arima(fore_data[,var_of_int,drop=FALSE],xreg=lm_a$residuals),
-  ets(ts(fore_data[,var_of_int,drop=FALSE],frequency=season))
-  
+  NA,#auto.arima(lm_$residuals)
+  NA,#arfima(lm_$residuals)
+  NA,#auto.arima(newDF_t[,var_of_int,drop=FALSE],xreg=lm_$residuals)
+  ets(ts(fore_data[,var_of_int,drop=FALSE],frequency=season)),
+  auto.arima(fore_data[,var_of_int,drop=FALSE],xreg=as.matrix(fore_data[,winners]))
 )
-'
 
 forecasts_a <- list(
   {
-    f_0 <- as.data.frame(forecast(models[[1]],h=horizon))
+    f_0 <- as.data.frame(forecast(models_a[[1]],h=horizon))
     f_0
   },
+  if(FALSE)
   {
     #arima of lm residuals
-    f_1 <- as.data.frame(forecast(models[[2]],h=horizon))
-    f_1
+    f_1 <- as.data.frame(forecast(models_a[[2]],h=horizon))
+    #f_1
+    NA
   },
+  if(FALSE)
   {
     #arfima of residuals
-    f_2 <- as.data.frame(forecast(models[[3]],h=horizon))
-    f_2
-  },
+    f_2 <- as.data.frame(forecast(models_a[[3]],h=horizon))
+    #f_2
+  }else
+  {NA},
+  if(FALSE)
   {
     #arima exogenous
     #residuals
     f_3 <- forecast(auto.arima(lm_a$residuals), h=horizon)
     #by selecting models[[4]], it's going to forecast y
-    f_3a <- forecast(models[[4]],xreg=f_3$mean)
-    f_3a
-  },
+    f_3a <- forecast(models_a[[4]],xreg=f_3$mean)
+    #f_3a
+  }else
+    {NA},
   {
-    f_4 <- as.data.frame(forecast(models[[5]],h=horizon))
+    f_4 <- as.data.frame(forecast(models_a[[5]],h=horizon))
+    rownames(f_4) <- rownames(actual)
     f_4
   },
-  f_4 <- as.data.frame(forecast(models[[6]]))
+  {
+    #proper arimax
+    f_5 <- as.data.frame(forecast(models_a[[6]], xreg=as.matrix(tail(fore_data[,winners,drop=FALSE],horizon))))
+    rownames(f_5) <- rownames(actual)
+    f_5
+  }
   
 )
 
 s_=sndif_[which(colnames(raw)==var_of_int)]
 d_=ndif_[which(colnames(raw)==var_of_int)]
-data_ <- c(na.omit(c(raw[,var_of_int],forecasts_a[which.min(errors)]$`Point Forecast`)))
-d_set_ <- (which(rownames(raw)==rownames(raw[1,,]))):(which(rownames(raw)==rownames(newDF_t[1,,]))+(d_-1))
-
-
+data_ <- c(na.omit(c(combo_[,var_of_int],forecasts_a[which.min(errors)][[1]]$`Point Forecast`)))
+#d_set_ <- (which(rownames(raw)==rownames(raw[1,,]))):(which(rownames(raw)==rownames(newDF_t[1,,]))+(d_-1))
 
 
 if(s_==0)
@@ -843,9 +851,9 @@ if(s_==0)
   inv_d <- diffinv(diffinv(data_,differences=d_,xi=raw[rownames(newDF_t[1:d_,]),var_of_int]),differences = s_,xi=raw[1:(season+1+d_),var_of_int])
 }
 
-
+raw[,var_of_int,drop=TRUE]
+inv_d
 length(inv_d)
-
 
 
 
