@@ -727,7 +727,8 @@ nv_diff_sets <- function(var_of_int,dataset,f_casts)
   s_=sndif_[which(colnames(raw)==var_of_int)]
   d_=ndif_[which(colnames(raw)==var_of_int)]
   #-1?, based on d_?
-  startRow = which(rownames(raw)==rownames(dataset[1:d_,]))
+  
+  startRow = which(rownames(raw)==rownames(dataset[1:d_,,drop=FALSE]))
   
   data_ <- c(na.omit(c(dataset[,var_of_int], f_casts)))
   
@@ -740,32 +741,27 @@ nv_diff_sets <- function(var_of_int,dataset,f_casts)
     inv_d <- diffinv(diffinv(data_,differences = d_, xi=raw[startRow,var_of_int]), differences = s_,xi=raw[startRow:(startRow+season-1),var_of_int])
   }
   
-  return(tail(inv_d,-1))
+  return(inv_d)
   
 }
+#raw[1,var_of_int,drop=TRUE]
 
 mean_ <- nv_diff_sets(var_of_int,newDF_t,forecasts[which.min(errors)][[1]][,1])
 lower_ <- nv_diff_sets(var_of_int,newDF_t,forecasts[which.min(errors)][[1]][,4])
 upper_ <- nv_diff_sets(var_of_int,newDF_t,forecasts[which.min(errors)][[1]][,5])
-nrow(actual)
-length(mean_)
+
+#nrow(actual)
 
 actual_ <- rbind(newDF_t[,var_of_int,drop=FALSE],newDF_h[1:horizon,var_of_int,drop=FALSE])
 
+actual <- nv_diff_sets(var_of_int,actual_,c())
 
 s_=sndif_[which(colnames(raw)==var_of_int)]
 d_=ndif_[which(colnames(raw)==var_of_int)]
   
-actual_2 <- tail(as.data.frame(diffinv(c(na.omit(actual_[,1])),differences=d_,xi=raw[which(rownames(actual_)[1]==rownames(raw)),var_of_int])),-1)
+actual_2 <- structure(data.frame(actual, row.names = rownames(actual_)),names=var_of_int)
 
-#actual_2
-
-#raw[,var_of_int,drop=FALSE]
-
-colnames(actual_2) <- colnames(actual_)
-rownames(actual_2) <- head(rownames(actual_),-1)
-
-df <- tail(data.frame(time = anydate(rownames(actual_2)[1:length(mean_)]), actual_2[1:length(mean_),1], mean_,lower_,upper_),horizon*2)
+df <- tail(data.frame(time = anydate(rownames(actual_2)), cbind(actual_2,mean_,lower_,upper_)),horizon*2)
 
 df <- melt(df ,  id.vars = 'time', variable.name = 'series')
 
@@ -837,7 +833,7 @@ forecasts_a <- list(
 
 s_=sndif_[which(colnames(raw)==var_of_int)]
 d_=ndif_[which(colnames(raw)==var_of_int)]
-data_ <- c(na.omit(c(combo_[,var_of_int],forecasts_a[which.min(errors)][[1]]$`Point Forecast`)))
+data_ <- c(na.omit(c(combo_[,var_of_int],forecasts_a[which.min(errors)][[1]][,1])))
 #d_set_ <- (which(rownames(raw)==rownames(raw[1,,]))):(which(rownames(raw)==rownames(newDF_t[1,,]))+(d_-1))
 
 
@@ -851,21 +847,45 @@ if(s_==0)
   inv_d <- diffinv(diffinv(data_,differences=d_,xi=raw[rownames(newDF_t[1:d_,]),var_of_int]),differences = s_,xi=raw[1:(season+1+d_),var_of_int])
 }
 
-raw[,var_of_int,drop=TRUE]
-inv_d
-length(inv_d)
+#raw[,var_of_int,drop=TRUE]
+#inv_d
+#length(inv_d)
 
+#properSet <- as.data.frame(c(matrix(NA,nrow=(nrow(raw)-length(inv_d))),inv_d))
+properSet <- as.data.frame(inv_d)
 
+#ts_ <- stats::lag(x=ts(combo_[,var_of_int,drop=FALSE],frequency=season),k=edge)
 
-diffinv(newDF_t[,var_of_int,drop=TRUE],differences=d_,xi=raw[rownames(newDF_t[1,]),var_of_int])
+#d_s <- c(anydate(rownames(raw)[1:edge]),anydate(rownames(raw)[1]) %m+% months(as.double(matrix(time(ts_)))*12))
 
-diffinv(newDF_t[,var_of_int],differences=d_)
+#df_ <- as.data.frame(matrix(NA,nrow=length(d_s)))
 
-raw[,var_of_int]
+rownames(properSet) <- anydate(d_s)
 
-properSet <- as.data.frame(c(matrix(NA,nrow=(nrow(raw)-length(inv_d))),inv_d))
 colnames(properSet) <- colnames(raw[,var_of_int,drop=FALSE])
-rownames(properSet) <- rownames(raw)
+#rownames(properSet) <- rownames(raw)
+
+nrow(raw)
+col.name = var_of_int
+
+t_ <- structure(data.frame(c(combo_[,var_of_int]), row.names = rownames(combo_)),names=var_of_int)
+
+
+nv_diff_sets(var_of_int,t_,c())
+
+na.omit(structure(data.frame(c(combo_[,var_of_int]), row.names = rownames(combo_)),names=var_of_int))
+
+structure(data.frame(inv_d, row.names = rownames(properSet)),names=var_of_int)
+
+na.omit(structure(data.frame(c(combo_[,var_of_int]), row.names = rownames(combo_)),names=var_of_int))
+
+
+
+mean_ <- nv_diff_sets(var_of_int,(structure(data.frame(c(combo_[,var_of_int]), row.names = rownames(combo_)),names=var_of_int)),forecasts_a[which.min(errors)][[1]][,1])
+lower_ <- nv_diff_sets(var_of_int,,forecasts_a[which.min(errors)][[1]][,4])
+upper_ <- nv_diff_sets(var_of_int,,forecasts_a[which.min(errors)][[1]][,5])
+#nrow(actual)
+length(mean_)
 
 mean_ <- nv_diff_sets(sndif_[which(colnames(raw)==var_of_int)],ndif_[which(colnames(raw)==var_of_int)],raw[rownames(newDF),var_of_int,drop=FALSE],season,c(forecasts_a[[which.min(errors)]]$`Point Forecast`))
 lower_ <- nv_diff_sets(sndif_[which(colnames(raw)==var_of_int)],ndif_[which(colnames(raw)==var_of_int)],raw[rownames(newDF),var_of_int,drop=FALSE],season,c(forecasts_a[[which.min(errors)]]$'Lo 95'))
