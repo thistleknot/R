@@ -298,6 +298,7 @@ if(FALSE)
 
 }
 
+
 ```
 
 ```{r}
@@ -305,7 +306,7 @@ if(FALSE)
 # Example usage: Critical correlation coefficient at sample size of n = 100
 
 names <- c()
-lags <- c()
+lags_ <- c()
 '
 numZero <- colSums(combo_d == 0, na.rm = T)
 
@@ -323,17 +324,22 @@ drops = names(which(numZero>=limit))
 
 combo_ <- na.omit(dplyr::select(combo_d, -c(drops)))
 '
-combo_ <- na.omit(combo_d)
+
+combo_ <- combo_d
 {
   training <- combo_[1:floor(nrow(combo_)*.7),]
   #validation <- training-round(nrow(combo_)*.7*.3,0)
   holdout <- combo_[(nrow(training)+1):nrow(combo_),]
 }
+
+training_nona <- na.omit(training)
   
-for(c in 1:(length(colnames(training))))
+for(c in 1:(length(colnames(training_nona))))
 {#c=3
   
-  ccf1 <- ccf(training[,var_of_int,drop=FALSE],training[,c], lag.max = season, correlation=TRUE, plot=FALSE)
+  temp <- na.omit(training)
+  
+  ccf1 <- ccf(training_nona[,var_of_int,drop=FALSE],training_nona[,c], lag.max = season, correlation=TRUE, plot=FALSE)
   
   crit = critical.r(ccf1$n.used)
   
@@ -348,19 +354,19 @@ for(c in 1:(length(colnames(training))))
     ind.max <- max(abs(ccf1$acf[candidates][which_max]))
     max.cor <- ccf1$acf[candidates][which_max]
     lag.opt <- ccf1$lag[candidates][which_max]
-    names <- c(names,(colnames(training)[c]))
-    print(colnames(training)[c])
-    print(lag.opt)
-    print(max.cor)
-    lags <- c(lags,lag.opt)
-    print(2 * (1 - pnorm(abs(max.cor), mean = 0, sd = 1/sqrt(ccf1$n.used))))
+    names <- c(names,(colnames(training_nona)[c]))
+    #print(colnames(training_nona)[c])
+    #print(lag.opt)
+    #print(max.cor)
+    lags_ <- c(lags_,lag.opt)
+    #print(2 * (1 - pnorm(abs(max.cor), mean = 0, sd = 1/sqrt(ccf1$n.used))))
   }
   
 }
 
 #needed if lag.opt>=0
 '
-if(min(lags)==0)
+if(min(lags_)==0)
 {
   
 }
@@ -376,18 +382,35 @@ names <- names[names %notin% var_of_int]
 ```{r}
 #ZCA backstep filter
 
-newDF <- combo_[,var_of_int,drop=FALSE]
+newDF_t <- training[,var_of_int,drop=FALSE]
 
+#nrow(newDF_t)
+
+#newDF_t <- lapply(1:length(names), function(n)
 for (n in 1:length(names))
 {
-  newDF <- cbind(newDF,dplyr::lag(combo_[,names[n],drop=FALSE],n=abs(lags[n])))
+  #n=1
+  #print(n)
+  #temp=dplyr::lag(combo_[,names[n],drop=FALSE],n=abs(lags_[n]),default = NA)
+  ts_ <- stats::lag(x=ts(training[,names[n],drop=FALSE],frequency=season),k=lags_[n])
+  temp <- as.data.frame(matrix(ts_))
+
+  rownames(temp) <- anydate(rownames(training)[1]) %m+% months(matrix(time(ts_))*12)
+  colnames(temp) <- names[n]
+
+  #rownames(temp)<-rownames(raw)
+  #tail(raw[,var_of_int,drop=FALSE])
+  #tail(raw[,"ASPUS",drop=FALSE])
+  #return(temp)
+  newDF_t <- cbind(newDF_t,temp)
   
 }
 
-newDF_t <- na.omit(newDF[1:nrow(training),])
-newDF_h <- newDF[(nrow(training)+1):nrow(combo_),]
+#tail(temp)
 
-#cor(na.omit(newDF[,c("MSPUS","M1"),]))
+#tail(newDF_t[,var_of_int])
+
+#cor(na.omit(newDF_t[,c("MSPUS","M1"),]))
 
 sig_table = matrix(0, ncol=ncol(newDF_t))
 colnames(sig_table) <- colnames(newDF_t)
@@ -412,7 +435,7 @@ exclude <- c()
 
 max_pvalue = 1
 
-subset = newDF_t[,c(colnames(newDF_t) %notin% c(exclude))]
+subset = na.omit(newDF_t[,c(colnames(newDF_t) %notin% c(exclude))])
 
 #View(subset[,c(colnames(newDF_t) %notin% c(var_of_int))])
 
@@ -454,8 +477,8 @@ while(max_pvalue>=p_threshold)
   
   if (max_pvalue >= p_threshold)
   {
-    print(max_pvalue)
-    print(max_pname)
+    #print(max_pvalue)
+    #print(max_pname)
     temp <- dplyr::select(subset_w,-c(max_pname))
     #temp <- dplyr::select(subset,-c(max_pname))
     if(ncol(temp)==1)
@@ -501,13 +524,21 @@ keepers = winners #colnames(sig_table)[sig_table>=(length(folds$train)/2)]
 '
 
 #as.data.frame(rbind(sndif_[which(match(colnames(raw),c(var_of_int,winners))>0)],ndif_[which(match(colnames(raw),c(var_of_int,winners))>0)]))
+```
+```{r}
+#newDF_t_ <- newDF[(nrow(training)+1):nrow(combo_),]
+#newDF_h_ <- newDF[(nrow(training)+1):nrow(combo_),]
 
+```
+
+
+```{r}
 #min of 1
-differences <- as.data.frame(rbind(c(0,lags[which(match(names,c(var_of_int,winners))>0)]),sndif_[which(match(colnames(raw),c(var_of_int,winners))>0)],ndif_[which(match(colnames(raw),c(var_of_int,winners))>0)]))
+differences <- as.data.frame(rbind(c(0,lags_[which(match(names,c(var_of_int,winners))>0)]),sndif_[which(match(colnames(raw),c(var_of_int,winners))>0)],ndif_[which(match(colnames(raw),c(var_of_int,winners))>0)]))
 
 #cbind(names[which(match(names,c(var_of_int,winners))>0)],
 
-#lags[which(match(colnames(raw),c(var_of_int,winners))>0)]
+#lags_[which(match(colnames(raw),c(var_of_int,winners))>0)]
 colnames(differences) <- c(var_of_int,winners)
 
 rownames(differences) <- c("lags","season","nonseason")
@@ -527,9 +558,63 @@ na.omit(newDF_t[,c(var_of_int,winners),drop=FALSE])
 #na.omit(combo_d[,c(var_of_int,winners),drop=FALSE])
 
 ```
+
 ```{r}
 
+#min of 1
 
+edge <- max(differences["lags",2:ncol(differences),])
+
+ts_ <- stats::lag(x=ts(combo_[,var_of_int,drop=FALSE],frequency=season),k=edge)
+
+d_s <- c(anydate(rownames(raw)[1:edge]),anydate(rownames(raw)[1]) %m+% months(as.double(matrix(time(ts_)))*12))
+
+df_ <- as.data.frame(matrix(NA,nrow=length(d_s)))
+
+rownames(df_) <- anydate(d_s)
+
+newDF <- merge(df_,combo_[,var_of_int,drop=FALSE],by=0,all.x = TRUE)
+rownames(newDF) <- newDF$Row.names
+
+newDF <- newDF[,var_of_int,drop=FALSE]
+
+#t_ <- as.data.frame(matrix(NA,nrow=length(d_s)),row.names = d_s)
+#merge(t_,raw[,var_of_int,drop=FALSE],by=0,all.x=TRUE)
+
+#newDF <- cbind(df_,combo_[,var_of_int,drop=FALSE])
+
+#nrow(df_)
+
+#nrow(newDF_t)
+
+#newDF_t <- lapply(1:length(names), function(n)
+for (n in 1:length(names))
+{
+  #n=1
+  #print(n)
+  #temp=dplyr::lag(combo_[,names[n],drop=FALSE],n=abs(lags_[n]),default = NA)
+  ts_ <- stats::lag(x=ts(combo_[,names[n],drop=FALSE],frequency=season),k=lags_[n])
+  temp <- as.data.frame(matrix(ts_))
+
+  rownames(temp) <- anydate(rownames(combo_)[1]) %m+% months(matrix(time(ts_))*12)
+  colnames(temp) <- names[n]
+
+  #rownames(temp)<-rownames(raw)
+  #tail(raw[,var_of_int,drop=FALSE])
+  #tail(raw[,"ASPUS",drop=FALSE])
+  #return(temp)
+  temp <- merge(df_,temp,by=0,all.x = TRUE)
+  rownames(temp) <- temp$Row.names
+  
+  temp <- temp[,names[n],drop=FALSE]
+
+  newDF <- cbind(newDF,temp)
+  
+}
+
+newDF_t_ <- newDF[1:floor(nrow(combo_)*.7),]
+#validation <- training-round(nrow(combo_)*.7*.3,0)
+newDF_h <- newDF[(nrow(newDF_t_)+1):nrow(combo_),]
 ```
 
 ```{r}
@@ -550,9 +635,9 @@ actual <- newDF_h[1:horizon,var_of_int,drop=FALSE]
 #straight arima of y
 models <- list(
   auto.arima(newDF_t[,var_of_int,drop=FALSE]),
-  #auto.arima(lm_$residuals),
-  #arfima(lm_$residuals),
-  #auto.arima(newDF_t[,var_of_int,drop=FALSE],xreg=lm_$residuals),
+  NA,#auto.arima(lm_$residuals)
+  NA,#arfima(lm_$residuals)
+  NA,#auto.arima(newDF_t[,var_of_int,drop=FALSE],xreg=lm_$residuals)
   ets(ts(newDF_t[,var_of_int,drop=FALSE],frequency=season)),
   auto.arima(newDF_t[,var_of_int,drop=FALSE],xreg=as.matrix(newDF_t[,winners]))
 )
@@ -566,11 +651,15 @@ forecasts <- list(
   if(FALSE)
   {
     #arima of lm residuals
-    f_1 <- as.data.frame(forecast(models[[3]],h=horizon))
+    f_1 <- as.data.frame(forecast(models[[2]],h=horizon))
     f_1a <- f_1 + t(predict(lm_,newdata=newDF_h[1:horizon,winners,drop=FALSE]))
     rownames(f_1a) <- rownames(actual)
     f_1a
-  },
+  }else
+  {
+    NA  
+  }
+  ,
   if(FALSE)
   {
     #arfima of residuals
@@ -578,6 +667,9 @@ forecasts <- list(
     f_2a <- f_2 + t(predict(lm_,newdata=newDF_h[1:horizon,winners,drop=FALSE]))
     rownames(f_2a) <- rownames(actual)
     f_2a
+  }else
+  {
+    NA
   },
   if(FALSE)
   {
@@ -589,15 +681,19 @@ forecasts <- list(
     #rownames(f_3a)
     rownames(f_3a) <- rownames(actual)
     f_3a
-  },
+  }else
+    {
+      NA
+    }
+  ,
   {
-    f_4 <- as.data.frame(forecast(models[[2]],h=horizon))
+    f_4 <- as.data.frame(forecast(models[[5]],h=horizon))
     rownames(f_4) <- rownames(actual)
     f_4
   },
   {
     #proper arimax
-    f_5 <- as.data.frame(forecast(models[[3]], xreg=as.matrix(newDF_h[1:horizon,winners,drop=FALSE]), h=horizon))
+    f_5 <- as.data.frame(forecast(models[[6]], xreg=as.matrix(newDF_h[1:horizon,winners,drop=FALSE]), h=horizon))
     rownames(f_5) <- rownames(actual)
     f_5
   }
@@ -605,9 +701,9 @@ forecasts <- list(
 
 errors <- list(
   mean(abs(forecasts[[1]]$`Point Forecast`-t(actual))),
-  #mean(abs(forecasts[[2]]$`Point Forecast`-t(actual))),
-  #mean(abs(forecasts[[3]]$`Point Forecast`-t(actual)))
-  #mean(abs(forecasts[[4]]$`Point Forecast`-t(actual))),
+  NA,#mean(abs(forecasts[[2]]$`Point Forecast`-t(actual)))
+  NA,#mean(abs(forecasts[[3]]$`Point Forecast`-t(actual))
+  NA,#mean(abs(forecasts[[4]]$`Point Forecast`-t(actual)))
   mean(abs(forecasts[[5]]$`Point Forecast`-t(actual))),
   mean(abs(forecasts[[6]]$`Point Forecast`-t(actual)))
 )
@@ -625,14 +721,15 @@ f_casts = forecasts[which.min(errors)][[1]][,1]
 
 nv_diff_sets <- function(var_of_int,dataset,f_casts)
 {
-  #dataset=actual_
+  #dataset=newDF_t
   #f_casts = c()
   #initialV <- dataset[1,]
   s_=sndif_[which(colnames(raw)==var_of_int)]
   d_=ndif_[which(colnames(raw)==var_of_int)]
-  startRow = which(rownames(raw)==rownames(dataset[1:d_,]))-1
+  #-1?, based on d_?
+  startRow = which(rownames(raw)==rownames(dataset[1:d_,]))
   
-  data_ <- na.omit(c(dataset[,var_of_int], f_casts))
+  data_ <- c(na.omit(c(dataset[,var_of_int], f_casts)))
   
   if(s_==0)
   {
@@ -650,17 +747,25 @@ nv_diff_sets <- function(var_of_int,dataset,f_casts)
 mean_ <- nv_diff_sets(var_of_int,newDF_t,forecasts[which.min(errors)][[1]][,1])
 lower_ <- nv_diff_sets(var_of_int,newDF_t,forecasts[which.min(errors)][[1]][,4])
 upper_ <- nv_diff_sets(var_of_int,newDF_t,forecasts[which.min(errors)][[1]][,5])
-nrow(actual_)
+nrow(actual)
 length(mean_)
 
 actual_ <- rbind(newDF_t[,var_of_int,drop=FALSE],newDF_h[1:horizon,var_of_int,drop=FALSE])
 
-actual_2 <- as.data.frame(tail(diffinv(actual_[,1],differences=d_,xi=raw[which(rownames(actual_)[1]==rownames(raw))-1,var_of_int]),-1))
+
+s_=sndif_[which(colnames(raw)==var_of_int)]
+d_=ndif_[which(colnames(raw)==var_of_int)]
+  
+actual_2 <- tail(as.data.frame(diffinv(c(na.omit(actual_[,1])),differences=d_,xi=raw[which(rownames(actual_)[1]==rownames(raw)),var_of_int])),-1)
+
+#actual_2
+
+#raw[,var_of_int,drop=FALSE]
 
 colnames(actual_2) <- colnames(actual_)
-rownames(actual_2) <- rownames(actual_)
+rownames(actual_2) <- head(rownames(actual_),-1)
 
-df <- tail(data.frame(time = anydate(rownames(actual_2)[1:length(mean_)]), actual_2, mean_,lower_,upper_),horizon*2)
+df <- tail(data.frame(time = anydate(rownames(actual_2)[1:length(mean_)]), actual_2[1:length(mean_),1], mean_,lower_,upper_),horizon*2)
 
 df <- melt(df ,  id.vars = 'time', variable.name = 'series')
 
@@ -671,33 +776,37 @@ ggplot(df, aes(time,value)) + geom_line(aes(colour = variable))
 ```{r}
 #actual forecast
 
-fore_data <- na.omit(newDF[,c(var_of_int,winners)])
+fore_data <- newDF[,c(var_of_int,winners)]
 
 lm_a <- lm(f, data=fore_data)
 
+fore_data
+
+'
 #straight arima of y
 models_a <- list(
   auto.arima(fore_data[,var_of_int,drop=FALSE]),
-  auto.arima(lm_a$residuals),
-  arfima(lm_a$residuals),
+  #auto.arima(lm_a$residuals),
+  #arfima(lm_a$residuals),
   auto.arima(fore_data[,var_of_int,drop=FALSE],xreg=lm_a$residuals),
   ets(ts(fore_data[,var_of_int,drop=FALSE],frequency=season))
+  
 )
-
+'
 
 forecasts_a <- list(
   {
-    f_0 <- as.data.frame(forecast(models_a[[1]],h=horizon))
+    f_0 <- as.data.frame(forecast(models[[1]],h=horizon))
     f_0
   },
   {
     #arima of lm residuals
-    f_1 <- as.data.frame(forecast(models_a[[2]],h=horizon))
+    f_1 <- as.data.frame(forecast(models[[2]],h=horizon))
     f_1
   },
   {
     #arfima of residuals
-    f_2 <- as.data.frame(forecast(models_a[[3]],h=horizon))
+    f_2 <- as.data.frame(forecast(models[[3]],h=horizon))
     f_2
   },
   {
@@ -705,13 +814,15 @@ forecasts_a <- list(
     #residuals
     f_3 <- forecast(auto.arima(lm_a$residuals), h=horizon)
     #by selecting models[[4]], it's going to forecast y
-    f_3a <- forecast(models_a[[4]],xreg=f_3$mean)
+    f_3a <- forecast(models[[4]],xreg=f_3$mean)
     f_3a
   },
   {
-    f_4 <- as.data.frame(forecast(models_a[[5]],h=horizon))
+    f_4 <- as.data.frame(forecast(models[[5]],h=horizon))
     f_4
-  }
+  },
+  f_4 <- as.data.frame(forecast(models[[6]]))
+  
 )
 
 s_=sndif_[which(colnames(raw)==var_of_int)]
