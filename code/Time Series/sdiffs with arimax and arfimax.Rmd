@@ -57,9 +57,8 @@ critical.r <- function( n, alpha = .05 ) {
 
 nv_diff_sets <- function(var_of_int,dataset,f_casts)
 {
-  #dataset=newDF_t
+  #dataset=actual_
   #f_casts = c()
-  #initialV <- dataset[1,]
   s_=sndif_[which(colnames(raw)==var_of_int)]
   d_=ndif_[which(colnames(raw)==var_of_int)]
   #-1?, based on d_?
@@ -136,17 +135,7 @@ plot(dm)
 
 ```{r}
 #test python functions
-if(FALSE)
-{
-  x <- read.csv(file="https://raw.githubusercontent.com/thistleknot/Python-Stock/master/data/raw/states.csv", header = TRUE, row.names = 1)
-  x_ <- x[,2:ncol(x)]
-  
-  zca <- py$ZCA()
-  
-  zca$fit_transform(x_)
-  
-  py$zca1(as.matrix(x[,2:ncol(x)]))
-}
+
 ```
 
 ```{r}
@@ -434,18 +423,21 @@ winners <- winners[winners %notin% var_of_int]
 
 ```{r}
 #min of 1
-differences <- as.data.frame(rbind(c(0,lags_[which(match(names,c(var_of_int,winners))>0)]),sndif_[which(match(colnames(raw),c(var_of_int,winners))>0)],ndif_[which(match(colnames(raw),c(var_of_int,winners))>0)]))
+
+differences <- as.data.frame(rbind(c(lags_[which(match(names,c(var_of_int,winners))>0)]),sndif_[which(match(colnames(raw),c(var_of_int,winners))>0)],ndif_[which(match(colnames(raw),c(var_of_int,winners))>0)]))
 
 colnames(differences) <- c(var_of_int,winners)
 
 rownames(differences) <- c("lags","season","nonseason")
 print(differences)
 
+differences["lags",var_of_int] <- 0
+
 for(h in c(var_of_int,winners))
 {
   hist(subset[,h])
 }
-
+differences
 ```
 
 ```{r}
@@ -465,29 +457,55 @@ df_ <- as.data.frame(matrix(NA,nrow=length(d_s)))
 rownames(df_) <- anydate(d_s)
 #View(df_)
 
-newDF <- merge(df_,combo_[,var_of_int,drop=FALSE],by=0,all.x = TRUE)
-rownames(newDF) <- newDF$Row.names
+#newDF <- merge(df_,combo_[,var_of_int,drop=FALSE],by=0,all.x = TRUE)
+#rownames(newDF) <- newDF$Row.names
 
-newDF <- newDF[,var_of_int,drop=FALSE]
+#newDF <- newDF[,var_of_int,drop=FALSE]
 
-for (n in 1:length(names))
-{
-  #n=1
-  #print(n)
-  ts_ <- stats::lag(x=ts(combo_[,names[n],drop=FALSE],frequency=season),k=lags_[n])
-  temp <- as.data.frame(matrix(ts_))
-
-  rownames(temp) <- anydate(rownames(combo_)[1]) %m+% months(matrix(time(ts_))*12)
-  colnames(temp) <- names[n]
-
-  temp <- merge(df_,temp,by=0,all.x = TRUE)
-  rownames(temp) <- temp$Row.names
+which(colnames(raw)==winners)
+#for (n in 1:length(names))
+newDF <- do.call(cbind,lapply(1:length(names),function(n)
+{#n=182
+  if(names[n]==var_of_int)
+  {
+    temp <- merge(df_,combo_[,var_of_int,drop=FALSE],by=0,all.x = TRUE)
+    temp = temp[,3,drop=FALSE]
+    colnames(temp) <- names[n]
+    rownames(temp) <- temp$Row.names
+  } else
+  {
+    #n=1
+    #print(n)
+    ts_i <- stats::lag(x=ts(combo_[,names[n],drop=FALSE],frequency=season,start = c(year(rownames(combo_)[1]),(month(rownames(combo_)[1])/12)*4)),k=-(lags_[n]))
+    temp <- as.data.frame(matrix(ts_i))
+    colnames(temp) <- names[n]
+    
+    qtrs = index(ts_i)-year(as.Date(yearqtr(index(ts_i)[1])))
+    
+    #rownames(temp) <- anydate(rownames(raw)[1]) %m+% months(qtrs*12)
+    
+    rownames(temp) <- anydate(rownames(raw[1,,drop=FALSE])) %m+% months(qtrs*12)
+    
+    temp <- merge(df_,temp,by=0,all.x = TRUE)
+    
+    #rownames(temp) <- #anydate(rownames(df_i)[1]) %m+% months(matrix(time(ts_))*12)
+    #colnames(temp) <- names[n]
   
-  temp <- temp[,names[n],drop=FALSE]
-
-  newDF <- cbind(newDF,temp)
+    #temp <- merge(df_i,,by=0,all.x = TRUE)
+    #rownames(temp) <- temp$Row.names
+    
+    #temp <- temp[,names[n],drop=FALSE]
+  }
+  return(temp[,names[n],drop=FALSE])
+  #newDF <- cbind(newDF,temp)
   
-}
+}))
+newDF[,winners,drop=FALSE]
+
+rownames(newDF) <- d_s
+
+#View(newDF)
+#newDF[,var_of_int,drop=FALSE] <- combo_[,var_of_int,drop=FALSE]
 
 ```
 
@@ -588,9 +606,9 @@ forecasts <- lapply(1:length(folds$train),function(f)
 })
 
 errors <- lapply(1:length(folds$train),function(f)
-{#f=19
+{#f=16
   test_ <- newDF[folds$test[f][[1]],var_of_int,drop=FALSE]
-  e_ <- list(
+  e_ <- list(#f=1
     mean(abs(forecasts[[f]][[1]]$`Point Forecast`-t(test_))),
     NA,#mean(abs(forecasts[[2]]$`Point Forecast`-t(test_)))
     NA,#mean(abs(forecasts[[3]]$`Point Forecast`-t(test_))
@@ -688,14 +706,12 @@ forecasts_a <- list(
   },
   {
     #proper arimax
-    f_5 <- as.data.frame(forecast(models_a[[6]], xreg=as.matrix(head(tail(fore_data[,winners,drop=FALSE],(season-1)),2))))
+    f_5 <- as.data.frame(forecast(models_a[[6]], xreg=as.matrix(head(tail(fore_data[,winners,drop=FALSE],(season-1)),horizon))))
     rownames(f_5) <- rownames(actual)
     f_5
   }
   
 )
-
-
 
 s_=sndif_[which(colnames(raw)==var_of_int)]
 d_=ndif_[which(colnames(raw)==var_of_int)]
@@ -712,7 +728,8 @@ if(s_==0)
 }
 
 prior <- (structure(data.frame(c(combo_[,var_of_int]), row.names = rownames(combo_)),names=var_of_int))
-
+#differences
+#newDF[,c(var_of_int,winners)]
 mean_ <- nv_diff_sets(var_of_int,prior,forecasts_a[best_model][[1]][,1])
 ```
 
@@ -721,7 +738,7 @@ mean_ <- nv_diff_sets(var_of_int,prior,forecasts_a[best_model][[1]][,1])
 lower_ <- nv_diff_sets(var_of_int,prior,(forecasts_a[best_model][[1]][,4]+forecasts_a[best_model][[1]][,1]))
 upper_ <- nv_diff_sets(var_of_int,prior,(forecasts_a[best_model][[1]][,5]+forecasts_a[best_model][[1]][,1]))
       
-df_a <- data.frame(time = d_s[1:length(mean_)], mean_,lower_,upper_)
+df_a <- data.frame(time = d_s, mean_,lower_,upper_)
 
 df_a <- melt(tail(df_a,horizon*4) ,  id.vars = 'time', variable.name = 'series')
 
