@@ -580,7 +580,7 @@ lm_ <- lm(f, data=na.omit(newDF_t[,c(var_of_int,winners)]))
 
 #checkresiduals(lm_$residuals)
 
-actual <- newDF_h[1:horizon,var_of_int,drop=FALSE]
+actual_h <- newDF_h[1:horizon,var_of_int,drop=FALSE]
 
 #straight arima of y
 models <- list(
@@ -595,7 +595,7 @@ models <- list(
 forecasts <- list(
   {
     f_0 <- as.data.frame(forecast(models[[1]],h=horizon))
-    rownames(f_0) <- rownames(actual)
+    rownames(f_0) <- rownames(actual_h)
     f_0
   },
   if(FALSE)
@@ -603,7 +603,7 @@ forecasts <- list(
     #arima of lm residuals
     f_1 <- as.data.frame(forecast(models[[2]],h=horizon))
     f_1a <- f_1 + t(predict(lm_,newdata=newDF_h[1:horizon,winners,drop=FALSE]))
-    rownames(f_1a) <- rownames(actual)
+    rownames(f_1a) <- rownames(actual_h)
     f_1a
   }else
   {
@@ -615,7 +615,7 @@ forecasts <- list(
     #arfima of residuals
     f_2 <- as.data.frame(forecast(models[[3]],h=horizon))
     f_2a <- f_2 + t(predict(lm_,newdata=newDF_h[1:horizon,winners,drop=FALSE]))
-    rownames(f_2a) <- rownames(actual)
+    rownames(f_2a) <- rownames(actual_h)
     f_2a
   }else
   {
@@ -629,7 +629,7 @@ forecasts <- list(
     f_3a <- as.data.frame(forecast(models[[4]],h=horizon,xreg=f_3_lm_r$mean))
     #lapply(c(2,3,4),function(x){f_3_lm_r[names(f_3_lm_r)[x]]})
     #rownames(f_3a)
-    rownames(f_3a) <- rownames(actual)
+    rownames(f_3a) <- rownames(actual_h)
     f_3a
   }else
     {
@@ -638,24 +638,24 @@ forecasts <- list(
   ,
   {
     f_4 <- as.data.frame(forecast(models[[5]],h=horizon))
-    rownames(f_4) <- rownames(actual)
+    rownames(f_4) <- rownames(actual_h)
     f_4
   },
   {
     #proper arimax
     f_5 <- as.data.frame(forecast(models[[6]], xreg=as.matrix(newDF_h[1:horizon,winners,drop=FALSE]), h=horizon))
-    rownames(f_5) <- rownames(actual)
+    rownames(f_5) <- rownames(actual_h)
     f_5
   }
 )
 
 errors <- list(
-  mean(abs(forecasts[[1]]$`Point Forecast`-t(actual))),
-  NA,#mean(abs(forecasts[[2]]$`Point Forecast`-t(actual)))
-  NA,#mean(abs(forecasts[[3]]$`Point Forecast`-t(actual))
-  NA,#mean(abs(forecasts[[4]]$`Point Forecast`-t(actual)))
-  mean(abs(forecasts[[5]]$`Point Forecast`-t(actual))),
-  mean(abs(forecasts[[6]]$`Point Forecast`-t(actual)))
+  mean(abs(forecasts[[1]]$`Point Forecast`-t(actual_h))),
+  NA,#mean(abs(forecasts[[2]]$`Point Forecast`-t(actual_h)))
+  NA,#mean(abs(forecasts[[3]]$`Point Forecast`-t(actual_h))
+  NA,#mean(abs(forecasts[[4]]$`Point Forecast`-t(actual_h)))
+  mean(abs(forecasts[[5]]$`Point Forecast`-t(actual_h))),
+  mean(abs(forecasts[[6]]$`Point Forecast`-t(actual_h)))
 )
 
 
@@ -675,7 +675,7 @@ mean_ <- nv_diff_sets(var_of_int,newDF_t,forecasts[which.min(errors)][[1]][,1])
 lower_ <- nv_diff_sets(var_of_int,newDF_t,forecasts[which.min(errors)][[1]][,4])
 upper_ <- nv_diff_sets(var_of_int,newDF_t,forecasts[which.min(errors)][[1]][,5])
 
-#nrow(actual)
+#nrow(actual_h)
 
 actual_ <- rbind(newDF_t[,var_of_int,drop=FALSE],newDF_h[1:horizon,var_of_int,drop=FALSE])
 
