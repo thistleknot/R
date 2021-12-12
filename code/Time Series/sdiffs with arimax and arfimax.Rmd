@@ -123,11 +123,15 @@ season = switch(
   "weekly"= 52,
 )  
 
-#plot(raw$GDPC1)
+var_of_int <- sample(colnames(raw),1)
 #var_of_int <- "MSPUS"
-#sort(colnames(raw))
-var_of_int <- "GDPC1"
-#var_of_int <- "LXXRCSA"
+#var_of_int <- "GDPC1"
+var_of_int <- "LXXRCSA"
+#var_of_int <- "AWHAETP"
+
+dm <- as.data.frame(cbind(anydate(rownames(raw)),raw[,var_of_int,drop=FALSE]))
+colnames(dm) <- c(date,var_of_int)
+plot(dm)
 ```
 
 ```{r}
@@ -353,8 +357,6 @@ newDF_t <- do.call(cbind,lapply(1:length(names), function(n)
   #newDF_t <- cbind(newDF_t,temp)
   
 }))
-
-#newDF_t <- cbind(newDF_t[,1,drop=FALSE],dplyr::select(newDF_t[,2:length(colnames(newDF_t)),drop=FALSE], -c(var_of_int)))
 
 sig_table = matrix(0, ncol=ncol(newDF_t))
 colnames(sig_table) <- colnames(newDF_t)
