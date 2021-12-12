@@ -437,14 +437,15 @@ for(h in c(var_of_int,winners))
 {
   hist(subset[,h])
 }
-differences
+
 ```
 
 ```{r}
 
 #min of 1
 
-edge <- max(differences["lags",2:ncol(differences),])
+#edge <- max(differences["lags",2:ncol(differences),])
+edge <- season-1
 
 #ts_ <- ts(raw[,var_of_int,drop=FALSE],frequency=season, start = c(year(rownames(combo_)[1]),(month(rownames(combo_)[1])/12)*4))
 
@@ -597,7 +598,7 @@ forecasts <- lapply(1:length(folds$train),function(f)
   },
   {
     #proper arimax
-    f_5 <- as.data.frame(forecast(models[[f]][[6]], xreg=as.matrix(test_[1:horizon,winners,drop=FALSE]), h=horizon))
+    f_5 <- as.data.frame(forecast(models[[f]][[6]], xreg=as.matrix(test_[,winners,drop=FALSE]), h=horizon))
     rownames(f_5) <- rownames(test_)
     f_5
   })
@@ -630,6 +631,8 @@ ave_errors <- lapply(1:length(models[[1]]), function(f)
   return(mean(unlist(errors_)))
 })
 
+print(ave_errors)
+
 best_model = which.min(ave_errors)
 print(best_model)
 
@@ -642,6 +645,7 @@ print(best_model)
 actual_ <- newDF[,var_of_int,drop=FALSE]
 
 actual <- nv_diff_sets(var_of_int,actual_,c())
+#raw[,var_of_int]
 
 s_=sndif_[which(colnames(raw)==var_of_int)]
 d_=ndif_[which(colnames(raw)==var_of_int)]
@@ -650,6 +654,17 @@ fore_data <- newDF[,c(var_of_int,winners)]
 
 f <- as.formula(paste(var_of_int, " ~."))
 lm_a <- lm(f, data=fore_data)
+summary(lm_a)
+
+differences
+cor(na.omit(fore_data))
+
+plot(newDF[,var_of_int], newDF[,winners], main="Scatterplot Example",pch=19)
+abline(lm(newDF[,var_of_int]~ newDF[,winners]), col="red") # regression line (y~x)
+
+#lines(lowess(newDF[,winners],newDF[,var_of_int]), col="blue") # lowess line (x,y)
+
+#summary(lm(newDF[,c(var_of_int,winners)]))
 
 print(summary(lm_a))
 plot(lm_a)
@@ -738,7 +753,7 @@ mean_ <- nv_diff_sets(var_of_int,prior,forecasts_a[best_model][[1]][,1])
 lower_ <- nv_diff_sets(var_of_int,prior,(forecasts_a[best_model][[1]][,4]+forecasts_a[best_model][[1]][,1]))
 upper_ <- nv_diff_sets(var_of_int,prior,(forecasts_a[best_model][[1]][,5]+forecasts_a[best_model][[1]][,1]))
       
-df_a <- data.frame(time = d_s, mean_,lower_,upper_)
+df_a <- data.frame(time = d_s[1:length(lower_)], mean_,lower_,upper_)
 
 df_a <- melt(tail(df_a,horizon*4) ,  id.vars = 'time', variable.name = 'series')
 
