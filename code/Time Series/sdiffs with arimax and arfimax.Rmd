@@ -124,8 +124,8 @@ season = switch(
 
 var_of_int <- sample(colnames(raw),1)
 #var_of_int <- "MSPUS"
-#var_of_int <- "GDPC1"
-var_of_int <- "LXXRCSA"
+var_of_int <- "GDPC1"
+#var_of_int <- "LXXRCSA"
 #var_of_int <- "AWHAETP"
 
 dm <- as.data.frame(cbind(anydate(rownames(raw)),raw[,var_of_int,drop=FALSE]))
@@ -535,14 +535,14 @@ models <- lapply(1:length(folds$train),function(f)
       #NA/NaN argument
       #arfima(train_[,var_of_int,drop=FALSE],xreg=as.matrix(train_[,winners]),estim=c("ls")),
       ets(ts(train_[,var_of_int,drop=FALSE],frequency=season)),
-      auto.arima(train_[,var_of_int,drop=FALSE],xreg=as.matrix(train_[,winners]))
+      auto.arima(train_[,var_of_int,drop=FALSE],xreg=as.matrix(structure(data.frame(const=matrix(1,nrow=nrow(train_)),train_[,winners]),names=c("constant",winners))))
     )
   return(m)
 })
 
 forecasts <- lapply(1:length(folds$train),function(f)
 {#f=1
-  print(f)
+  #print(f)
   train_ <- newDF[folds$train[f][[1]],,drop=FALSE]
   
   test_ <- newDF[folds$test[f][[1]],,drop=FALSE]
@@ -598,7 +598,7 @@ forecasts <- lapply(1:length(folds$train),function(f)
   },
   {
     #proper arimax
-    f_5 <- as.data.frame(forecast(models[[f]][[6]], xreg=as.matrix(test_[,winners,drop=FALSE]), h=horizon))
+    f_5 <- as.data.frame(forecast(models[[f]][[6]],xreg=as.matrix(structure(data.frame(const=matrix(1,nrow=nrow(test_)),test_[,winners]),names=c("constant",winners)))))
     rownames(f_5) <- rownames(test_)
     f_5
   })
@@ -666,7 +666,6 @@ abline(lm(newDF[,var_of_int]~ newDF[,winners]), col="red") # regression line (y~
 
 #summary(lm(newDF[,c(var_of_int,winners)]))
 
-print(summary(lm_a))
 plot(lm_a)
 
 checkresiduals(lm_a$residuals)
@@ -680,7 +679,7 @@ models_a <- list(
   NA,#arfima(lm_$residuals)
   NA,#auto.arima(newDF_t[,var_of_int,drop=FALSE],xreg=lm_$residuals)
   ets(ts(fore_data[,var_of_int,drop=FALSE],frequency=season)),
-  auto.arima(fore_data[,var_of_int,drop=FALSE],xreg=as.matrix(fore_data[,winners]))
+  auto.arima(fore_data[,var_of_int,drop=FALSE],xreg=as.matrix(structure(data.frame(const=matrix(1,nrow=nrow(fore_data)),fore_data[,winners]),names=c("constant",winners))))
 )
 
 models_a[best_model]
@@ -721,7 +720,7 @@ forecasts_a <- list(
   },
   {
     #proper arimax
-    f_5 <- as.data.frame(forecast(models_a[[6]], xreg=as.matrix(head(tail(fore_data[,winners,drop=FALSE],(season-1)),horizon))))
+    f_5 <- as.data.frame(forecast(models_a[[6]],xreg=as.matrix(structure(data.frame(const=matrix(1,nrow=nrow(head(tail(fore_data[,winners,drop=FALSE],(season-1)),horizon))),head(tail(fore_data[,winners,drop=FALSE],(season-1)),horizon)),names=c("constant",winners)))))
     rownames(f_5) <- rownames(actual)
     f_5
   }
