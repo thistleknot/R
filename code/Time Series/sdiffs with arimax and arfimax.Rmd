@@ -546,6 +546,7 @@ models <- lapply(1:length(folds$train),function(f)
       #NA/NaN argument
       #arfima(train_[,var_of_int,drop=FALSE],xreg=as.matrix(train_[,winners]),estim=c("ls")),
       ets(ts(train_[,var_of_int,drop=FALSE],frequency=season)),
+      #auto.arima(train_[,var_of_int,drop=FALSE],xreg=as.matrix(as.matrix(structure(data.frame(matrix(1,nrow=nrow(train_)),train_[,winners]),names=c("constant",winners)))))
       auto.arima(train_[,var_of_int,drop=FALSE],xreg=as.matrix(train_[,winners]))
     )
   return(m)
@@ -610,6 +611,7 @@ forecasts <- lapply(1:length(folds$train),function(f)
   {
     #proper arimax
     f_5 <- as.data.frame(forecast(models[[f]][[6]], xreg=as.matrix(test_[,winners,drop=FALSE]), h=horizon))
+    #f_5 <- as.data.frame(forecast(models[[f]][[6]], xreg=as.matrix(as.matrix(structure(data.frame(matrix(1,nrow=nrow(test_)),test_[,winners,drop=FALSE]),names=c("constant",winners)))), h=horizon))
     rownames(f_5) <- rownames(test_)
     f_5
   })
@@ -681,7 +683,7 @@ plot(lm_a)
 
 checkresiduals(lm_a$residuals)
 
-fore_data
+#fore_data
 
 #straight arima of y
 models_a <- list(
@@ -690,11 +692,9 @@ models_a <- list(
   NA,#arfima(lm_$residuals)
   NA,#auto.arima(newDF_t[,var_of_int,drop=FALSE],xreg=lm_$residuals)
   ets(ts(fore_data[,var_of_int,drop=FALSE],frequency=season)),
-  #xreg=structure(data.frame(const=matrix(1,nrow=nrow(fore_data)),fore_data[,winners]),names=c("constant",winners))
-  auto.arima(fore_data[,var_of_int,drop=FALSE],xreg=as.matrix(fore_data[,winners]))
+  #auto.arima(fore_data[,var_of_int,drop=FALSE],xreg=as.matrix(structure(data.frame(matrix(1,nrow=nrow(fore_data)),fore_data[,winners]),names=c("constant",winners))))
+  auto.arima(fore_data[,var_of_int,drop=FALSE],xreg=as.matrix(structure(data.frame(matrix(1,nrow=nrow(fore_data)),fore_data[,winners]),names=c("constant",winners))))
 )
-
-
 
 models_a[best_model]
 
@@ -734,7 +734,8 @@ forecasts_a <- list(
   },
   {
     #proper arimax
-    f_5 <- as.data.frame(forecast(models_a[[6]], xreg=as.matrix(head(tail(fore_data[,winners,drop=FALSE],(season-1)),horizon))))
+    
+    f_5 <- as.data.frame(forecast(models_a[[6]], xreg=as.matrix(head(tail(as.matrix(structure(data.frame(matrix(1,nrow=nrow(fore_data)),fore_data[,winners]),names=c("constant",winners))),(season-1)),horizon))))
     rownames(f_5) <- rownames(actual)
     f_5
   }
@@ -778,7 +779,7 @@ ggplot(df_a, aes(time,value)) + geom_line(aes(colour = variable)) + ggtitle(var_
 
 ```{r}
 
-#plot(nv_diff_sets(var_of_int,structure(data.frame(lm_a$fitted.values),names=var_of_int),c()),nv_diff_sets(var_of_int, fore_data[rownames(data.frame(lm_a$fitted.values)),var_of_int,drop=FALSE],c()))
+plot(nv_diff_sets(var_of_int,structure(data.frame(lm_a$fitted.values),names=var_of_int),c()),nv_diff_sets(var_of_int, fore_data[rownames(data.frame(lm_a$fitted.values)),var_of_int,drop=FALSE],c()))
 #differences
 
 ```
