@@ -79,6 +79,16 @@ nv_diff_sets <- function(var_of_int,dataset,f_casts)
   return(inv_d)
   
 }
+
+
+lagpad <- function(x, k) {
+  if (k>0) {
+    return (c(rep(NA, k), x)[1 : length(x)] );
+  }
+  else {
+    return (c(x[(-k+1) : length(x)], rep(NA, -k)));
+  }
+}
 ```
 
 ```{python}
@@ -329,23 +339,27 @@ if(min(lags_)==0)
 ```{r}
 #ZCA backstep filter
 
+
 newDF_t <- do.call(cbind,lapply(1:length(names), function(n)
 {#ensure var_of_int isn't differences
+  #n=1
   if(names[n]==var_of_int)
   {
     temp <- training[,var_of_int,drop=FALSE]
   }else
   {
-  ts_ <- stats::lag(x=ts(training[,names[n],drop=FALSE],frequency=season),k=lags_[n])
-  temp <- as.data.frame(matrix(ts_))
+  #date_ = anydate(rownames(combo_)[1]) %m+% months(lags_[n]*3)
+  temp = data.frame(lagpad(training[,names[n],drop=TRUE],lags_[n]))
 
-  rownames(temp) <- anydate(rownames(training)[1]) %m+% months(matrix(time(ts_))*12)
+  rownames(temp) <- rownames(training)#anydate(rownames(training)[1]) %m+% months(matrix(time(ts_))*12)
   colnames(temp) <- names[n]
   }
   return(temp)
   #newDF_t <- cbind(newDF_t,temp)
   
 }))
+
+View(newDF_t[,1,drop=FALSE])
 
 sig_table = matrix(0, ncol=ncol(newDF_t))
 colnames(sig_table) <- colnames(newDF_t)
@@ -766,5 +780,8 @@ ggplot(df_a, aes(time,value)) + geom_line(aes(colour = variable)) + ggtitle(var_
 
 
 ```{r}
+
+#plot(nv_diff_sets(var_of_int,structure(data.frame(lm_a$fitted.values),names=var_of_int),c()),nv_diff_sets(var_of_int, fore_data[rownames(data.frame(lm_a$fitted.values)),var_of_int,drop=FALSE],c()))
+#differences
 
 ```
