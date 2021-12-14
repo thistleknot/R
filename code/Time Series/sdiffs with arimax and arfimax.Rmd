@@ -286,7 +286,6 @@ combo_ <- combo_d
   holdout <- combo_[(nrow(training)+1):nrow(combo_),]
 }
 
-
 training_nona <- na.omit(training)
 
 #lags_[which(colnames(raw)==var_of_int)]
@@ -358,8 +357,6 @@ newDF_t <- do.call(cbind,lapply(1:length(names), function(n)
   #newDF_t <- cbind(newDF_t,temp)
   
 }))
-
-View(newDF_t[,1,drop=FALSE])
 
 sig_table = matrix(0, ncol=ncol(newDF_t))
 colnames(sig_table) <- colnames(newDF_t)
