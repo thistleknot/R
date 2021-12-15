@@ -1,0 +1,65 @@
+```{r}
+library("forecast")
+library("zoo")
+library("reshape2")
+library("ggplot2")
+```
+
+```{r}
+df <- read.csv(file="/mnt/c/Users/mb445c/Documents/personal/excel/test_data.csv", header = T)
+```
+
+```{r}
+
+diff_df <-data.frame(as.vector(diff(zoo(df[,1,drop=FALSE]), na.pad=TRUE)),as.vector(diff(zoo(df[,2,drop=FALSE]), na.pad=TRUE)),as.vector(diff(zoo(df[,3,drop=FALSE]), na.pad=TRUE)))
+colnames(diff_df) <- colnames(df)
+
+diff_df <-data.frame(df[,1,drop=FALSE],df[,2,drop=FALSE],df[,3,drop=FALSE])
+colnames(diff_df) <- colnames(df)
+
+diff_t_df <- diff_df[1:17,]
+diff_h_df <- diff_df[18:20,]
+
+```
+
+#ndiffs(df[,1])
+
+#diffinv(diff(df[,1],differences=2),differences=2,xi=c(1,2))
+
+df_t_diff_lm <- lm(Y~.,data=diff_t_df)
+
+ar_t <- auto.arima(df_t_diff_lm$residuals)
+
+df_t_diff_f <- data.frame(forecast(df_t_diff_lm,na.omit(diff_h_df[,1:2,drop=FALSE])))
+
+df_t_diff_ar_f <- head(data.frame(forecast(ar_t)),nrow(na.omit(diff_h_df[,1:2,drop=FALSE])))
+
+df_t_diff_ar_lm_f <- data.frame(as.matrix(df_t_diff_f[,1,drop=FALSE]) + df_t_diff_ar_f)
+
+ar_t_x <- auto.arima(diff_t_df[,3,drop=FALSE],xreg=as.matrix(diff_t_df[,1:2,drop=FALSE]))
+
+ar_t_x_f <- data.frame(forecast(ar_t_x,xreg=as.matrix(na.omit(diff_h_df[,1:2,drop=FALSE]))))
+
+ar_t_x_c <- auto.arima(diff_t_df[,3,drop=FALSE],xreg=as.matrix(data.frame(as.matrix(1,nrow=nrow(diff_t_df)),diff_t_df[,1:2,drop=FALSE])))
+
+ar_t_x_f_c <- data.frame(forecast(ar_t_x_c,xreg=as.matrix(data.frame(as.matrix(1,nrow=nrow(diff_h_df)),diff_h_df[,1:2,drop=FALSE]))))
+
+
+e1 <- mean(abs(ar_t_x_f[,1]-diff_h_df[,3]))
+
+e2 <- mean(abs(df_t_diff_ar_lm_f[,1]-diff_h_df[,3]))
+
+e3 <- mean(abs(ar_t_x_f_c[,1]-diff_h_df[,3]))
+
+df_a <- data.frame(time=rownames(ar_t_x_f),ar_t_x_f)
+#df_a <- melt(df_a,  id.vars = 'time', variable.name = 'series')
+
+#df_a[] <- lapply(df_a, as.numeric)
+#df_a$series <- as.factor(df_a$series)
+
+#ggplot(df_a, aes(value,time),group=1) + geom_line(aes(colour = series))
+# + ggtitle(var_of_int)
+plot(df_a[,2])
+lines(df_a[,3])
+lines(df_a[,4])
+
