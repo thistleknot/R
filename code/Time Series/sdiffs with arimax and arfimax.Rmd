@@ -1,7 +1,7 @@
 ```{r}
 #packages
 {
-packages <- c("dplyr","caret","splitTools","ggplot2","quantmod","zoo","plyr","forecast","timetk","tseries","tidyverse","furrr","reticulate","geometry","reshape","lubridate","anytime","car","caret","ppcor","whitening","TSA","corrplot")
+packages <- c("dplyr","caret","splitTools","ggplot2","quantmod","zoo","plyr","forecast","fmdates","timetk","tseries","tidyverse","furrr","reticulate","geometry","reshape","lubridate","anytime","car","caret","ppcor","whitening","TSA","corrplot")
 
 # Install packages not yet installed
 installed_packages <- packages %in% rownames(installed.packages())
@@ -12,6 +12,10 @@ if (any(installed_packages == FALSE)) {
 # Packages loading
 invisible(lapply(packages, library, character.only = TRUE))
 }
+
+#devtools::install_github("imanuelcostigan/fmdates")
+
+
 ```
 
 ```{r}
@@ -133,8 +137,8 @@ season = switch(
 )  
 
 var_of_int <- sample(colnames(raw),1)
-var_of_int <- "MSPUS"
-#var_of_int <- "GDPC1"
+#var_of_int <- "MSPUS"
+var_of_int <- "GDPC1"
 #var_of_int <- "LXXRCSA"
 #var_of_int <- "AWHAETP"
 
@@ -462,7 +466,9 @@ edge <- season-1
 
 ts_ <- stats::lag(x=ts(combo_[,var_of_int,drop=FALSE],frequency=season, start = c(year(rownames(combo_)[1]),(month(rownames(combo_)[1])/12)*4), ),k=-edge)
 
-d_s <- c(anydate(rownames(raw)[1:edge]),anydate(rownames(raw)[1]) %m+% months((index(ts_)-year(anydate(rownames(raw)[1])))*12))
+#anydate(rownames(raw)[1:4]) %m+% quarters(1)
+
+d_s <- eom(c(anydate(rownames(raw)[1:edge]),anydate(rownames(raw)[1]) %m+% months((index(ts_)-year(anydate(rownames(raw)[1])))*12)))
 
 df_ <- as.data.frame(matrix(NA,nrow=length(d_s)))
 
@@ -475,9 +481,11 @@ rownames(df_) <- anydate(d_s)
 #newDF <- newDF[,var_of_int,drop=FALSE]
 
 which(colnames(raw)==winners)
+
+which(colnames(raw)==var_of_int)
 #for (n in 1:length(names))
 newDF <- do.call(cbind,lapply(1:length(names),function(n)
-{#n=182
+{#n=156
   if(names[n]==var_of_int)
   {
     temp <- merge(df_,combo_[,var_of_int,drop=FALSE],by=0,all.x = TRUE)
@@ -488,6 +496,7 @@ newDF <- do.call(cbind,lapply(1:length(names),function(n)
   {
     #n=1
     #print(n)
+    #ts(raw[,var_of_int],frequency = season)
     ts_i <- stats::lag(x=ts(combo_[,names[n],drop=FALSE],frequency=season,start = c(year(rownames(combo_)[1]),(month(rownames(combo_)[1])/12)*4)),k=-(lags_[n]))
     temp <- as.data.frame(matrix(ts_i))
     colnames(temp) <- names[n]
@@ -496,7 +505,7 @@ newDF <- do.call(cbind,lapply(1:length(names),function(n)
     
     #rownames(temp) <- anydate(rownames(raw)[1]) %m+% months(qtrs*12)
     
-    rownames(temp) <- anydate(rownames(raw[1,,drop=FALSE])) %m+% months(qtrs*12)
+    rownames(temp) <- eom(anydate(rownames(raw[1,,drop=FALSE])) %m+% months(qtrs*12))
     
     temp <- merge(df_,temp,by=0,all.x = TRUE)
     
@@ -528,10 +537,14 @@ horizon = min(differences["lags",2:ncol(differences),])
 
 n=floor(nrow(combo_)*.7)
 
+#View(newDF[,c(var_of_int,winners),drop=FALSE])
+
 #View(newDF[,c(var_of_int,winners)])
 
 folds = createTimeSlices(head(rownames(newDF),-(season-1)), initialWindow = n, horizon=horizon, fixedWindow = F)
 length(folds$train)
+
+final_fold_size = length((folds$train[length(folds$train)])[[1]])
 
 models <- lapply(1:length(folds$train),function(f)
 {
@@ -619,25 +632,30 @@ forecasts <- lapply(1:length(folds$train),function(f)
   
 })
 
+#View(forecasts)
+
 errors <- lapply(1:length(folds$train),function(f)
 {#f=16
   test_ <- newDF[folds$test[f][[1]],var_of_int,drop=FALSE]
   e_ <- list(#f=1
-    mean(abs(forecasts[[f]][[1]]$`Point Forecast`-t(test_))),
+    sum((abs(forecasts[[f]][[1]]$`Point Forecast`-t(test_)))*nrow(test_)/final_fold_size),
     NA,#mean(abs(forecasts[[2]]$`Point Forecast`-t(test_)))
     NA,#mean(abs(forecasts[[3]]$`Point Forecast`-t(test_))
     NA,#mean(abs(forecasts[[4]]$`Point Forecast`-t(test_)))
-    mean(abs(forecasts[[f]][[5]]$`Point Forecast`-t(test_))),
-    mean(abs(forecasts[[f]][[6]]$`Point Forecast`-t(test_)))
+    sum((abs(forecasts[[f]][[5]]$`Point Forecast`-t(test_)))*nrow(test_)/final_fold_size),
+    sum((abs(forecasts[[f]][[6]]$`Point Forecast`-t(test_)))*nrow(test_)/final_fold_size)
   )
   
   return(e_)
 })
 
+#View(errors)
 #raw[,var_of_int]
 
+#View(models)
+
 ave_errors <- lapply(1:length(models[[1]]), function(f)
-{#f=1
+{#f=10
   errors_ <- lapply(errors, function(e){#e=errors[[2]] [[f]]
     e[[f]]
   })
@@ -683,7 +701,11 @@ plot(lm_a)
 
 checkresiduals(lm_a$residuals)
 
-#fore_data
+#View(raw[,var_of_int,drop=FALSE])
+
+#sndif_[colnames(raw)==var_of_int]
+#View(combo_[,var_of_int,drop=FALSE])
+#View(fore_data)
 
 #straight arima of y
 models_a <- list(
