@@ -133,9 +133,9 @@ season = switch(
 )  
 
 var_of_int <- sample(colnames(raw),1)
-#var_of_int <- "MSPUS"
+var_of_int <- "MSPUS"
 #var_of_int <- "GDPC1"
-var_of_int <- "LXXRCSA"
+#var_of_int <- "LXXRCSA"
 #var_of_int <- "AWHAETP"
 
 dm <- as.data.frame(cbind(anydate(rownames(raw)),raw[,var_of_int,drop=FALSE]))
@@ -530,7 +530,7 @@ n=floor(nrow(combo_)*.7)
 
 #View(newDF[,c(var_of_int,winners)])
 
-folds = createTimeSlices(head(rownames(newDF),-(season-1)), initialWindow = n, horizon=horizon, fixedWindow = T)
+folds = createTimeSlices(head(rownames(newDF),-(season-1)), initialWindow = n, horizon=horizon, fixedWindow = F)
 length(folds$train)
 
 models <- lapply(1:length(folds$train),function(f)
