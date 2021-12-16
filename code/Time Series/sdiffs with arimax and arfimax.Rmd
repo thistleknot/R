@@ -487,6 +487,12 @@ which(colnames(raw)==winners)
 
 lags_[which(colnames(raw)==winners)]
 
+ndif_[which(colnames(raw)==winners)]
+sndif_[which(colnames(raw)==winners)]
+
+sndif_[which(colnames(raw)==var_of_int)]
+ndif_[which(colnames(raw)==var_of_int)]
+
 tail(fore_data)
 
 head(fore_data)
@@ -502,10 +508,12 @@ write.csv(combo_[,winners,drop=FALSE], "combo_.csv", row.names = TRUE)
 combo_[,c(var_of_int,winners),]
 
 which(colnames(raw)==var_of_int)
+which(colnames(raw)==winners)
 '
+
 #for (n in 1:length(names))
 newDF <- do.call(cbind,lapply(1:length(names),function(n)
-{#n=156
+{#n=236
   #print(n)
   if(names[n]==var_of_int)
   {
@@ -518,6 +526,12 @@ newDF <- do.call(cbind,lapply(1:length(names),function(n)
     #n=1
     #print(n)
     #ts(raw[,var_of_int],frequency = season)
+    temp <- merge(df_,combo_[,names[n],drop=FALSE],by=0,all.x=TRUE)
+    temp <- data.frame(lagpad(temp[,names[n],],lags_[n]))
+    rownames(temp) <- d_s#anydate(rownames(training)[1]) %m+% months(matrix(time(ts_))*12)
+    colnames(temp) <- names[n]
+  
+    '
     ts_i <- stats::lag(x=ts(combo_[,names[n],drop=FALSE],frequency=season,start = c(year(rownames(combo_)[1]),(month(rownames(combo_)[1])/12)*4)),k=-(lags_[n]))
     temp <- as.data.frame(matrix(ts_i))
     colnames(temp) <- names[n]
@@ -529,7 +543,7 @@ newDF <- do.call(cbind,lapply(1:length(names),function(n)
     rownames(temp) <- eom(anydate(rownames(raw[1,,drop=FALSE])) %m+% months(qtrs*12))
     
     temp <- merge(df_,temp,by=0,all.x = TRUE)
-    
+    '
     #rownames(temp) <- #anydate(rownames(df_i)[1]) %m+% months(matrix(time(ts_))*12)
     #colnames(temp) <- names[n]
   
@@ -545,6 +559,8 @@ newDF <- do.call(cbind,lapply(1:length(names),function(n)
 #newDF[,winners,drop=FALSE]
 
 rownames(newDF) <- d_s
+
+#View(newDF[,winners,drop=FALSE])
 
 #View(newDF)
 #newDF[,var_of_int,drop=FALSE] <- combo_[,var_of_int,drop=FALSE]
