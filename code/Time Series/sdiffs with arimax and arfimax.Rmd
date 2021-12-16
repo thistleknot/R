@@ -138,8 +138,8 @@ season = switch(
 
 var_of_int <- sample(colnames(raw),1)
 #var_of_int <- "MSPUS"
-var_of_int <- "GDPC1"
-#var_of_int <- "LXXRCSA"
+#var_of_int <- "GDPC1"
+var_of_int <- "LXXRCSA"
 #var_of_int <- "AWHAETP"
 
 dm <- as.data.frame(cbind(anydate(rownames(raw)),raw[,var_of_int,drop=FALSE]))
@@ -506,7 +506,7 @@ which(colnames(raw)==var_of_int)
 #for (n in 1:length(names))
 newDF <- do.call(cbind,lapply(1:length(names),function(n)
 {#n=156
-  print(n)
+  #print(n)
   if(names[n]==var_of_int)
   {
     temp <- merge(df_,combo_[,var_of_int,drop=FALSE],by=0,all.x = TRUE)
