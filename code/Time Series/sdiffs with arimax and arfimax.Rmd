@@ -59,17 +59,23 @@ critical.r <- function( n, alpha = .05 ) {
   return(critical.r)
 }
 
-nv_diff_sets <- function(var_of_int,dataset,f_casts)
+nv_diff_sets <- function(v_of_i,dataset,f_casts)
 {
-  #dataset=actual_
+  #v_of_i=var_of_int
+  #dataset=structure(data.frame(lm_a$fitted.values),names=var_of_int)
   #f_casts = c()
   s_=sndif_[which(colnames(raw)==var_of_int)]
   d_=ndif_[which(colnames(raw)==var_of_int)]
   #-1?, based on d_?
   
-  startRow = which(rownames(raw)==rownames(dataset[1:d_,,drop=FALSE]))
+  startRow = c()
+  for (r in rownames(dataset[1:d_,,drop=FALSE]))
+  {
+    startRow = c(startRow,which(rownames(raw)==r))
+  }
   
   data_ <- c(na.omit(c(dataset[,var_of_int], f_casts)))
+  
   
   if(s_==0)
   {
@@ -459,59 +465,16 @@ for(h in c(var_of_int,winners))
 
 #min of 1
 
-#edge <- max(differences["lags",2:ncol(differences),])
 edge <- season-1
 
-#ts_ <- ts(raw[,var_of_int,drop=FALSE],frequency=season, start = c(year(rownames(combo_)[1]),(month(rownames(combo_)[1])/12)*4))
-
 ts_ <- stats::lag(x=ts(combo_[,var_of_int,drop=FALSE],frequency=season, start = c(year(rownames(combo_)[1]),(month(rownames(combo_)[1])/12)*4), ),k=-edge)
-
-#(index(ts_)-index(ts(combo_[,var_of_int,drop=FALSE],frequency=season, start = c(year(rownames(combo_)[1]),(month(rownames(combo_)[1])/12)*4), )))*12
-
-
-#d_s <- eom(c(anydate(rownames(raw)[1:edge]),anydate(rownames(raw)[1]) %m+% months((index(ts_)-year(anydate(rownames(raw)[1])))*12)))
 
 d_s <- eom(c(anydate(rownames(raw)),anydate(tail(eom(seq.Date(anydate(rownames(raw)[nrow(raw)]), ((anydate(rownames(raw)[nrow(raw)]) %m+% months((12/season)*edge))),by='quarters')),-1))))
 
 df_ <- as.data.frame(matrix(NA,nrow=length(d_s)))
 
 rownames(df_) <- anydate(d_s)
-#View(df_)
 
-#newDF <- merge(df_,combo_[,var_of_int,drop=FALSE],by=0,all.x = TRUE)
-#rownames(newDF) <- newDF$Row.names
-
-#newDF <- newDF[,var_of_int,drop=FALSE]
-'
-which(colnames(raw)==winners)
-
-lags_[which(colnames(raw)==winners)]
-
-ndif_[which(colnames(raw)==winners)]
-sndif_[which(colnames(raw)==winners)]
-
-sndif_[which(colnames(raw)==var_of_int)]
-ndif_[which(colnames(raw)==var_of_int)]
-
-tail(fore_data)
-
-head(fore_data)
-
-View(cbind(combo_[,winners],fore_data[,winners]))
-
-View(fore_data[,,drop=FALSE])
-
-write.csv(fore_data, "fore.csv", row.names = TRUE)
-write.csv(combo_[,winners,drop=FALSE], "combo_.csv", row.names = TRUE)
-#write.csv(fore_data)
-
-combo_[,c(var_of_int,winners),]
-
-which(colnames(raw)==var_of_int)
-which(colnames(raw)==winners)
-'
-
-#for (n in 1:length(names))
 newDF <- do.call(cbind,lapply(1:length(names),function(n)
 {#n=236
   #print(n)
@@ -525,45 +488,17 @@ newDF <- do.call(cbind,lapply(1:length(names),function(n)
   {
     #n=1
     #print(n)
-    #ts(raw[,var_of_int],frequency = season)
     temp <- merge(df_,combo_[,names[n],drop=FALSE],by=0,all.x=TRUE)
     temp <- data.frame(lagpad(temp[,names[n],],lags_[n]))
     rownames(temp) <- d_s#anydate(rownames(training)[1]) %m+% months(matrix(time(ts_))*12)
     colnames(temp) <- names[n]
-  
-    '
-    ts_i <- stats::lag(x=ts(combo_[,names[n],drop=FALSE],frequency=season,start = c(year(rownames(combo_)[1]),(month(rownames(combo_)[1])/12)*4)),k=-(lags_[n]))
-    temp <- as.data.frame(matrix(ts_i))
-    colnames(temp) <- names[n]
-    
-    qtrs = index(ts_i)-year(as.Date(yearqtr(index(ts_i)[1])))
-    
-    #rownames(temp) <- anydate(rownames(raw)[1]) %m+% months(qtrs*12)
-    
-    rownames(temp) <- eom(anydate(rownames(raw[1,,drop=FALSE])) %m+% months(qtrs*12))
-    
-    temp <- merge(df_,temp,by=0,all.x = TRUE)
-    '
-    #rownames(temp) <- #anydate(rownames(df_i)[1]) %m+% months(matrix(time(ts_))*12)
-    #colnames(temp) <- names[n]
-  
-    #temp <- merge(df_i,,by=0,all.x = TRUE)
-    #rownames(temp) <- temp$Row.names
-    
-    #temp <- temp[,names[n],drop=FALSE]
   }
   return(temp[,names[n],drop=FALSE])
   #newDF <- cbind(newDF,temp)
   
 }))
-#newDF[,winners,drop=FALSE]
 
 rownames(newDF) <- d_s
-
-#View(newDF[,winners,drop=FALSE])
-
-#View(newDF)
-#newDF[,var_of_int,drop=FALSE] <- combo_[,var_of_int,drop=FALSE]
 
 ```
 
