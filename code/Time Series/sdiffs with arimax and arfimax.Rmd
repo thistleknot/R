@@ -660,7 +660,7 @@ lm_a <- lm(f, data=fore_data)
 summary(lm_a)
 
 differences
-cor(na.omit(fore_data))
+corrplot(cor(na.omit(fore_data)))
 
 plot(newDF[,var_of_int], newDF[,winners], main="Scatterplot Example",pch=19)
 abline(lm(newDF[,var_of_int]~ newDF[,winners]), col="red") # regression line (y~x)
